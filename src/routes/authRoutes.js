@@ -32,9 +32,14 @@ router.post('/login-membro', async (req, res) => {
   try {
     const { codigo, data_nascimento } = req.body;
 
+    if (!codigo || !data_nascimento) {
+      return res.status(400).json({ error: 'Código e data de nascimento são obrigatórios.' });
+    }
+
     const result = await query(
       'SELECT * FROM membros WHERE codigo = $1 AND DATE(data_nascimento) = $2',
-      [codigo, data_nascimento]
+      //                                              ↑ DATE() resolve o problema do formato
+      [codigo.trim().toUpperCase(), data_nascimento]
     );
 
     if (result.rowCount === 0) {
@@ -49,9 +54,7 @@ router.post('/login-membro', async (req, res) => {
       { expiresIn: '8h' }
     );
 
-    // ← garante que retorna o membro aqui
-    res.json({ token, membro });
-
+    res.json({ token, membro }); // ← garante que retorna o membro
   } catch (err) {
     console.error('login-membro error:', err);
     res.status(500).json({ error: 'Erro interno do servidor.' });
