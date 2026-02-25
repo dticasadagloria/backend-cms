@@ -29,22 +29,33 @@ router.put('/users/:id', authenticate, requireRole(1), updateUser);
 router.delete('/users/:id', authenticate, requireRole(1), deleteUser);
 
 router.post('/login-membro', async (req, res) => {
-  const { codigo, data_nascimento } = req.body;
-  
-  const membro = await query(
-    'SELECT * FROM membros WHERE codigo = $1 AND data_nascimento = $2',
-    [codigo, data_nascimento]
-  );
+  try {
+    const { codigo, data_nascimento } = req.body;
 
-  if (!membro) return res.status(401).json({ error: 'Código ou data de nascimento incorrectos' });
+    const result = await query(
+      'SELECT * FROM membros WHERE codigo = $1 AND DATE(data_nascimento) = $2',
+      [codigo, data_nascimento]
+    );
 
-  const token = jwt.sign(
-    { id: membro.id, codigo: membro.codigo, tipo: 'membro' },
-    process.env.JWT_SECRET,
-    { expiresIn: '8h' }
-  );
+    if (result.rowCount === 0) {
+      return res.status(401).json({ error: 'Código ou data de nascimento incorrectos.' });
+    }
 
-  res.json({ token });
+    const membro = result.rows[0];
+
+    const token = jwt.sign(
+      { id: membro.id, codigo: membro.codigo, tipo: 'membro' },
+      process.env.JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    // ← garante que retorna o membro aqui
+    res.json({ token, membro });
+
+  } catch (err) {
+    console.error('login-membro error:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
 });
 
 
