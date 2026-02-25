@@ -112,16 +112,16 @@ app.use((req, res) => {
 // Iniciar servidor
 app.listen(PORT, async () => {
   console.log('='.repeat(60));
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
   console.log('='.repeat(60));
-  console.log('📋 Available routes:');
-  console.log(`   GET  http://localhost:${PORT}/`);
-  console.log(`   POST http://localhost:${PORT}/auth/register`);
-  console.log(`   POST http://localhost:${PORT}/auth/login`);
-  console.log(`   GET  http://localhost:${PORT}/auth/me (requires token)`);
-  console.log(`   GET  http://localhost:${PORT}/test/connection`);
-  console.log(`   GET  http://localhost:${PORT}/test/roles`);
-  console.log(`   GET  http://localhost:${PORT}/test/users`);
+  console.log('Available routes:');
+  console.log(`GET  http://localhost:${PORT}/`);
+  console.log(`POST http://localhost:${PORT}/auth/register`);
+  console.log(`POST http://localhost:${PORT}/auth/login`);
+  console.log(`GET  http://localhost:${PORT}/auth/me (requires token)`);
+  console.log(`GET  http://localhost:${PORT}/test/connection`);
+  console.log(`GET  http://localhost:${PORT}/test/roles`);
+  console.log(`GET  http://localhost:${PORT}/test/users`);
   console.log('='.repeat(60));
 
   // Testar conexão DB ao iniciar

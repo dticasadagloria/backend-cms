@@ -7,13 +7,13 @@ const SALT_ROUNDS = 10;
 
 // Validar JWT_SECRET
 if (!process.env.JWT_SECRET) {
-  console.error('❌ FATAL ERROR: JWT_SECRET is not defined in .env');
+  console.error('FATAL ERROR: JWT_SECRET is not defined in .env');
   process.exit(1);
 }
 
 // ==================== REGISTER ====================
 export const register = async (req, res) => {
-  console.log('\n📝 REGISTRATION ATTEMPT');
+  console.log('\nREGISTRATION ATTEMPT');
   console.log('Body received:', { username: req.body.username, role_id: req.body.role_id });
 
   const { username, password, role_id } = req.body;
@@ -46,7 +46,7 @@ export const register = async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    console.log('🎉 Registration successful!\n');
+    console.log('Registration successful!\n');
     res.status(201).json({
       message: 'User registered successfully',
       user: {
@@ -60,7 +60,7 @@ export const register = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('💥 REGISTRATION ERROR:', error.message);
+    console.error('REGISTRATION ERROR:', error.message);
     if (error.code === '23505') return res.status(409).json({ message: 'Username already in use' });
     if (error.code === '23503') return res.status(400).json({ message: 'Invalid role_id' });
     res.status(500).json({ message: 'Internal server error', error: error.message });
@@ -69,7 +69,7 @@ export const register = async (req, res) => {
 
 // ==================== LOGIN ====================
 export const login = async (req, res) => {
-  console.log('\n🔐 LOGIN ATTEMPT - Username:', req.body.username);
+  console.log('\nLOGIN ATTEMPT - Username:', req.body.username);
 
   const { username, password } = req.body;
 
@@ -98,7 +98,7 @@ export const login = async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    console.log('🎉 Login successful!\n');
+    console.log('Login successful!\n');
     res.status(200).json({
       message: 'Login successful',
       user: { id: user.id, username: user.username, role_id: user.role_id, ativo: user.ativo },
@@ -106,7 +106,7 @@ export const login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('💥 LOGIN ERROR:', error.message);
+    console.error('LOGIN ERROR:', error.message);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -135,7 +135,7 @@ export const getMe = async (req, res) => {
 // PUT /auth/change-password
 // Requer: autenticação (qualquer utilizador pode trocar a sua própria senha)
 export const changePassword = async (req, res) => {
-  console.log('\n🔑 CHANGE PASSWORD - User:', req.user?.username);
+  console.log('\nCHANGE PASSWORD - User:', req.user?.username);
 
   const { senhaActual, novaSenha, confirmarSenha } = req.body;
 
@@ -178,7 +178,7 @@ export const changePassword = async (req, res) => {
     // 6️⃣ Verifica se a senha actual está correcta
     const isMatch = await bcrypt.compare(senhaActual, user.password_hash);
     if (!isMatch) {
-      console.log('❌ Wrong current password');
+      console.log('Wrong current password');
       return res.status(400).json({ message: 'Senha actual incorrecta' });
     }
 
@@ -189,11 +189,11 @@ export const changePassword = async (req, res) => {
       [newHash, req.user.id]
     );
 
-    console.log('✅ Password changed successfully for user:', req.user.username);
+    console.log('Password changed successfully for user:', req.user.username);
     res.status(200).json({ message: 'Senha alterada com sucesso' });
 
   } catch (error) {
-    console.error('💥 CHANGE PASSWORD ERROR:', error.message);
+    console.error('CHANGE PASSWORD ERROR:', error.message);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -207,7 +207,7 @@ export const getAllUsersHandler = async (req, res) => {
   try {
     const users = await getAllUsers();
 
-    console.log(`✅ Returned ${users.length} users`);
+    console.log(`Returned ${users.length} users`);
     res.status(200).json({
       success: true,
       count: users.length,
@@ -215,7 +215,7 @@ export const getAllUsersHandler = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('💥 GET ALL USERS ERROR:', error.message);
+    console.error('GET ALL USERS ERROR:', error.message);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -224,7 +224,7 @@ export const getAllUsersHandler = async (req, res) => {
 // PUT /auth/users/:id
 // Requer: autenticação + role Admin (role_id = 1)
 export const updateUser = async (req, res) => {
-  console.log('\n✏️  UPDATE USER - ID:', req.params.id);
+  console.log('\nUPDATE USER - ID:', req.params.id);
 
   const { id } = req.params;
   const { username, role_id } = req.body;
@@ -276,14 +276,14 @@ export const updateUser = async (req, res) => {
       [newUsername, newRoleId, id]
     );
 
-    console.log('✅ User updated:', result.rows[0]);
+    console.log('User updated:', result.rows[0]);
     res.status(200).json({
       message: 'Utilizador actualizado com sucesso',
       user: result.rows[0]
     });
 
   } catch (error) {
-    console.error('💥 UPDATE USER ERROR:', error.message);
+    console.error('UPDATE USER ERROR:', error.message);
     if (error.code === '23505') {
       return res.status(409).json({ message: 'Username já está em uso' });
     }
@@ -296,7 +296,7 @@ export const updateUser = async (req, res) => {
 // Requer: autenticação + role Admin (role_id = 1)
 // Não apaga fisicamente — apenas desactiva (ativo = false)
 export const deleteUser = async (req, res) => {
-  console.log('\n🚫 DEACTIVATE USER - ID:', req.params.id);
+  console.log('\nDEACTIVATE USER - ID:', req.params.id);
 
   const { id } = req.params;
 
@@ -328,14 +328,14 @@ export const deleteUser = async (req, res) => {
       [id]
     );
 
-    console.log('✅ User deactivated:', result.rows[0]);
+    console.log('User deactivated:', result.rows[0]);
     res.status(200).json({
       message: 'Utilizador desactivado com sucesso',
       user: result.rows[0]
     });
 
   } catch (error) {
-    console.error('💥 DEACTIVATE USER ERROR:', error.message);
+    console.error('DEACTIVATE USER ERROR:', error.message);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -344,7 +344,7 @@ export const deleteUser = async (req, res) => {
 // PATCH /auth/users/:id/reactivate
 // Requer: autenticação + role Admin (role_id = 1)
 export const reactivateUser = async (req, res) => {
-  console.log('\n✅ REACTIVATE USER - ID:', req.params.id);
+  console.log('\nREACTIVATE USER - ID:', req.params.id);
 
   const { id } = req.params;
 
@@ -366,14 +366,16 @@ export const reactivateUser = async (req, res) => {
       [id]
     );
 
-    console.log('✅ User reactivated:', result.rows[0]);
+    console.log('User reactivated:', result.rows[0]);
     res.status(200).json({
       message: 'Utilizador reactivado com sucesso',
       user: result.rows[0]
     });
 
   } catch (error) {
-    console.error('💥 REACTIVATE USER ERROR:', error.message);
+    console.error('REACTIVATE USER ERROR:', error.message);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+//Login de membros comuns 
