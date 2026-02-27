@@ -100,7 +100,7 @@ export const obterPresencas = async (req, res) => {
     const result = await query(`
       SELECT
         m.id as membro_id,
-        m.nome_membro,
+        m.nome as nome_membro, 
         m.contacto,
         m.codigo,
         b.nome as nome_branch,
@@ -110,7 +110,7 @@ export const obterPresencas = async (req, res) => {
       LEFT JOIN branches b ON m.branch_id = b.id
       LEFT JOIN frequencias f ON f.membro_id = m.id AND f.culto_id = $1
       WHERE m.ativo = true
-      ORDER BY m.nome_membro ASC
+      ORDER BY m.nome ASC
     `, [culto_id]);
 
     const presentes  = result.rows.filter((r) => r.presente === true).length;
