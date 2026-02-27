@@ -23,7 +23,7 @@ app.use(
       "https://casadagloria-cms.vercel.app", 
       "http://localhost:5173",               // ✅ para testes locais
     ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
