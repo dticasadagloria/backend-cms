@@ -19,6 +19,7 @@ app.use(
   cors({
     origin: [
       "https://iicgp-frontend.onrender.com", // ✅ domínio do frontend
+      "https://casadagloria-cms.vercel.app", 
       "http://localhost:5173",               // ✅ para testes locais
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
