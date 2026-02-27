@@ -7,6 +7,7 @@ import {
   salvarPresencas,
   obterPresencas,
   importarCSV,
+  estatisticasGerais, presencasPorMes, presencasPorCulto 
 } from "../controllers/cultosController.js";
 import { authenticate } from "../middleware/authMiddleware.js";
 import multer from "multer";
@@ -14,7 +15,7 @@ import multer from "multer";
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// ✅ Rotas mais específicas PRIMEIRO
+// Rotas mais específicas PRIMEIRO
 router.get("/",                                authenticate, listarCultos);
 router.post("/",                               authenticate, criarCulto);
 
@@ -22,8 +23,14 @@ router.get("/:id/presencas",                   authenticate, obterPresencas);
 router.post("/:id/presencas",                  authenticate, salvarPresencas);
 router.post("/:id/importar", authenticate, upload.single("ficheiro"), importarCSV);
 
-// ✅ Rotas genéricas POR ÚLTIMO
+// Rotas genéricas POR ÚLTIMO
 router.get("/:id",                             authenticate, obterCulto);
 router.delete("/:id",                          authenticate, apagarCulto);
+
+
+// Estatisticas gerais dos cultos
+router.get("/stats/gerais",        authenticate, estatisticasGerais);
+router.get("/stats/por-mes",       authenticate, presencasPorMes);
+router.get("/stats/por-culto",     authenticate, presencasPorCulto);
 
 export default router;

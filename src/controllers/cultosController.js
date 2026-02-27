@@ -182,3 +182,84 @@ export const importarCSV = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+
+// ── Estatísticas gerais ──────────────────────────────────────────────────────
+export const estatisticasGerais = async (req, res) => {
+  try {
+    const totalCultos = await query(`SELECT COUNT(*) as total FROM cultos`);
+    const totalPresencas = await query(`SELECT COUNT(*) as total FROM frequencias WHERE presente = true`);
+    const totalMembros = await query(`SELECT COUNT(*) as total FROM membros WHERE ativo = true`);
+    const mediaPorCulto = await query(`
+      SELECT ROUND(AVG(total_presentes), 1) as media FROM cultos WHERE total_presentes > 0
+    `);
+
+    res.json({
+      success: true,
+      stats: {
+        totalCultos:    parseInt(totalCultos.rows[0].total),
+        totalPresencas: parseInt(totalPresencas.rows[0].total),
+        totalMembros:   parseInt(totalMembros.rows[0].total),
+        mediaPorCulto:  parseFloat(mediaPorCulto.rows[0].media) || 0,
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// ── Presenças por mês ────────────────────────────────────────────────────────
+export const presencasPorMes = async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT
+        TO_CHAR(c.data, 'Mon YYYY') as mes,
+        TO_CHAR(c.data, 'YYYY-MM')  as mes_ordem,
+        COUNT(DISTINCT c.id)                                          as total_cultos,
+        SUM(CASE WHEN f.presente = true  THEN 1 ELSE 0 END)          as presentes,
+        SUM(CASE WHEN f.presente = false THEN 1 ELSE 0 END)          as ausentes,
+        COUNT(f.id)                                                   as total_registos,
+        ROUND(
+          SUM(CASE WHEN f.presente = true THEN 1 ELSE 0 END)::numeric
+          / NULLIF(COUNT(f.id), 0) * 100, 1
+        ) as taxa_presenca
+      FROM cultos c
+      LEFT JOIN frequencias f ON f.culto_id = c.id
+      GROUP BY TO_CHAR(c.data, 'Mon YYYY'), TO_CHAR(c.data, 'YYYY-MM')
+      ORDER BY mes_ordem ASC
+    `);
+
+    res.json({ success: true, dados: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// ── Presenças por culto ──────────────────────────────────────────────────────
+export const presencasPorCulto = async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT
+        c.id,
+        c.tipo,
+        c.data,
+        TO_CHAR(c.data, 'DD/MM') as data_curta,
+        c.pregador,
+        COUNT(CASE WHEN f.presente = true  THEN 1 END) as presentes,
+        COUNT(CASE WHEN f.presente = false THEN 1 END) as ausentes,
+        COUNT(f.id)                                    as total,
+        ROUND(
+          COUNT(CASE WHEN f.presente = true THEN 1 END)::numeric
+          / NULLIF(COUNT(f.id), 0) * 100, 1
+        ) as taxa_presenca
+      FROM cultos c
+      LEFT JOIN frequencias f ON f.culto_id = c.id
+      GROUP BY c.id, c.tipo, c.data, c.pregador
+      ORDER BY c.data DESC
+      LIMIT 10
+    `);
+
+    res.json({ success: true, dados: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
