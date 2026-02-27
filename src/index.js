@@ -6,6 +6,7 @@ import membroRoutes from "./routes/membroRoutes.js";
 import restauracoesRoutes from "./routes/restauracoesRoutes.js";
 import cultosRoutes from "./routes/cultosRoutes.js";
 import { query } from "./config/db.js";
+import { iniciarScheduler } from "./jobs/scheduler.js";
 
 // Carregar variáveis de ambiente
 dotenv.config();
@@ -125,6 +126,16 @@ app.use((req, res) => {
   });
 });
 
+
+//Admin post de ativo ou inativo
+app.post("/admin/verificar-presencas", async (req, res) => {
+  try {
+    await verificarPresencasMembros();
+    res.json({ success: true, message: "Verificação concluída" });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 // ==================== INICIAR SERVIDOR ====================
 
 app.listen(PORT, async () => {
@@ -140,6 +151,8 @@ app.listen(PORT, async () => {
   console.log(`GET  http://localhost:${PORT}/test/roles`);
   console.log(`GET  http://localhost:${PORT}/test/users`);
   console.log("=".repeat(60));
+
+  iniciarScheduler();
 
   try {
     const res = await query("SELECT NOW()");
