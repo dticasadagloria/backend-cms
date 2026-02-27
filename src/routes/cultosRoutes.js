@@ -8,18 +8,18 @@ import {
   obterPresencas,
   importarCSV,
 } from "../controllers/cultosController.js";
-import { verifyToken } from "../middleware/authMiddleware.js";
+import { authenticate } from "../middleware/authMiddleware.js";
 import multer from "multer";
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.post("/",                          verifyToken, criarCulto);
-router.get("/",                           verifyToken, listarCultos);
-router.get("/:id",                        verifyToken, obterCulto);
-router.delete("/:id",                     verifyToken, apagarCulto);
-router.post("/:id/presencas",             verifyToken, salvarPresencas);
-router.get("/:id/presencas",              verifyToken, obterPresencas);
-router.post("/:id/importar",              verifyToken, upload.single("ficheiro"), importarCSV);
+router.post("/",                          authenticate, criarCulto);
+router.get("/",                           authenticate, listarCultos);
+router.get("/:id",                        authenticate, obterCulto);
+router.delete("/:id",                     authenticate, apagarCulto);
+router.post("/:id/presencas",             authenticate, salvarPresencas);
+router.get("/:id/presencas",              authenticate, obterPresencas);
+router.post("/:id/importar",              authenticate, upload.single("ficheiro"), importarCSV);
 
 export default router;
