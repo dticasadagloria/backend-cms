@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes.js";
 import membroRoutes from "./routes/membroRoutes.js";
 import restauracoesRoutes from "./routes/restauracoesRoutes.js";
+import cultosRoutes from "./routes/cultosRoutes.js";
 import { query } from "./config/db.js";
 
 // Carregar variáveis de ambiente
@@ -14,7 +15,7 @@ const PORT = process.env.PORT || 3000;
 
 // ==================== MIDDLEWARES ====================
 
-// 🔥 Configuração CORS completa (para evitar erro 405)
+// Configuração CORS completa (para evitar erro 405)
 app.use(
   cors({
     origin: [
@@ -27,7 +28,7 @@ app.use(
   })
 );
 
-// ✅ Responde automaticamente a preflight requests (OPTIONS)
+// Responde automaticamente a preflight requests (OPTIONS)
 app.options("/{*any}", cors());
 
 // Permite JSON no corpo das requisições
@@ -56,6 +57,7 @@ app.use("/auth", authRoutes);
 // Outras rotas
 app.use("/api/membros", membroRoutes);
 app.use("/api/restauracoes", restauracoesRoutes);
+app.use("/api/cultos", cultosRoutes);
 
 // ==================== ROTAS DE TESTE ====================
 
