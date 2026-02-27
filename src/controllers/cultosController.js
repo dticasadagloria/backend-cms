@@ -263,3 +263,70 @@ export const presencasPorCulto = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+
+
+// ── Top 10 membros mais assíduos ─────────────────────────────────────────────
+export const maisAssiduos = async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT
+        m.id,
+        m.nome_membro,
+        b.nome as nome_branch,
+        COUNT(f.id) as total_presencas
+      FROM membros m
+      LEFT JOIN branches b ON m.branch_id = b.id
+      LEFT JOIN frequencias f ON f.membro_id = m.id AND f.presente = true
+      GROUP BY m.id, m.nome_membro, b.nome
+      ORDER BY total_presencas DESC
+      LIMIT 10
+    `);
+    res.json({ success: true, dados: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// ── Top 10 membros com mais faltas ───────────────────────────────────────────
+export const maisFaltas = async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT
+        m.id,
+        m.nome_membro,
+        b.nome as nome_branch,
+        COUNT(f.id) as total_faltas
+      FROM membros m
+      LEFT JOIN branches b ON m.branch_id = b.id
+      LEFT JOIN frequencias f ON f.membro_id = m.id AND f.presente = false
+      GROUP BY m.id, m.nome_membro, b.nome
+      ORDER BY total_faltas DESC
+      LIMIT 10
+    `);
+    res.json({ success: true, dados: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// ── Top 10 cultos com maior afluência ────────────────────────────────────────
+export const melhorCulto = async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT
+        c.id,
+        c.tipo,
+        TO_CHAR(c.data, 'DD/MM/YYYY') as data_curta,
+        c.pregador,
+        COUNT(CASE WHEN f.presente = true THEN 1 END) as presentes
+      FROM cultos c
+      LEFT JOIN frequencias f ON f.culto_id = c.id
+      GROUP BY c.id, c.tipo, c.data, c.pregador
+      ORDER BY presentes DESC
+      LIMIT 10
+    `);
+    res.json({ success: true, dados: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};

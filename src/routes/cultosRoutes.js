@@ -7,7 +7,8 @@ import {
   salvarPresencas,
   obterPresencas,
   importarCSV,
-  estatisticasGerais, presencasPorMes, presencasPorCulto 
+  estatisticasGerais, presencasPorMes, presencasPorCulto,
+  maisAssiduos, maisFaltas, melhorCulto 
 } from "../controllers/cultosController.js";
 import { authenticate } from "../middleware/authMiddleware.js";
 import multer from "multer";
@@ -32,5 +33,10 @@ router.delete("/:id",                          authenticate, apagarCulto);
 router.get("/stats/gerais",        authenticate, estatisticasGerais);
 router.get("/stats/por-mes",       authenticate, presencasPorMes);
 router.get("/stats/por-culto",     authenticate, presencasPorCulto);
+
+// Estatisticas de membros
+router.get("/stats/mais-assiduos", authenticate, maisAssiduos);
+router.get("/stats/mais-faltas",   authenticate, maisFaltas);
+router.get("/stats/melhor-culto",  authenticate, melhorCulto);
 
 export default router;
