@@ -93,7 +93,7 @@ export const converterEmMembro = async (req, res) => {
     // Cria o membro
     const novoMembro = await query(`
       INSERT INTO membros
-        (nome_membro, genero, contacto, bairro, branch_id, codigo,
+        (nome, genero, contacto, bairro, branch_id, codigo,
          ano_ingresso, estado_civil, ocupacao, batizado, escola_da_verdade, ativo)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,true)
       RETURNING *
