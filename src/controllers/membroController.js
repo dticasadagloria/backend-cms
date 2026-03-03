@@ -224,3 +224,40 @@ export const reactivateMembroHandler = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+
+// ── Membros sem célula ───────────────────────────────────────────────────────
+export const membrosSemCelula = async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT
+        m.id,
+        m.codigo,
+        m.nome_membro,
+        m.contacto,
+        m.email
+        m.bairro
+        b.nome as nome_branch
+      FROM membros m
+      LEFT JOIN branches b ON m.branch_id = b.id
+      WHERE m.celula_id IS NULL
+        AND m.ativo = true
+      ORDER BY m.nome_membro ASC
+    `);
+
+    const total = await query(`SELECT COUNT(*) as total FROM membros WHERE ativo = true`);
+    const comCelula = await query(`SELECT COUNT(*) as total FROM membros WHERE celula_id IS NOT NULL AND ativo = true`);
+
+    res.json({
+      success: true,
+      semCelula: result.rows,
+      stats: {
+        total:      parseInt(total.rows[0].total),
+        comCelula:  parseInt(comCelula.rows[0].total),
+        semCelula:  result.rowCount,
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};

@@ -6,7 +6,8 @@ import {
   updateMembroHandler,
   deleteMembroHandler,
   deleteMembroHardHandler,
-  reactivateMembroHandler
+  reactivateMembroHandler,
+  membrosSemCelula
 } from '../controllers/membroController.js';
 import { authenticate } from '../middleware/authMiddleware.js';
 import { requireRole } from '../middleware/authMiddleware.js';
@@ -16,6 +17,7 @@ const router = express.Router();
 // Todos os users autenticados podem ver
 router.get('/', authenticate, getAllMembrosHandler);
 router.get('/:id', authenticate, getMembroByIdHandler);
+router.get("/sem-celula", authenticate, membrosSemCelula);
 
 // Apenas Admin e Pastor podem criar/editar/deletar
 router.post  ('/',    authenticate, requireRole(1, 2), createMembroHandler);
