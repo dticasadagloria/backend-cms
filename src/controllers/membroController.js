@@ -231,11 +231,10 @@ export const membrosSemCelula = async (req, res) => {
     const result = await query(`
       SELECT
         m.id,
-        m.codigo,
         m.nome,
         m.contacto,
-        m.email
-        m.bairro
+        m.email,
+        m.codigo,
         b.nome as nome_branch
       FROM membros m
       LEFT JOIN branches b ON m.branch_id = b.id
@@ -244,21 +243,25 @@ export const membrosSemCelula = async (req, res) => {
       ORDER BY m.nome_membro ASC
     `);
 
-    const total = await query(
-      `SELECT COUNT(*) as total FROM membros WHERE ativo = true`,
-    );
-    const comCelula = await query(
-      `SELECT COUNT(*) as total FROM membros WHERE celula_id IS NOT NULL AND ativo = true`,
-    );
+    const statsResult = await query(`
+      SELECT
+        COUNT(*)                    as total,
+        COUNT(celula_id)            as com_celula,
+        COUNT(*) - COUNT(celula_id) as sem_celula
+      FROM membros
+      WHERE ativo = true
+    `);
+
+    const s = statsResult.rows[0];
 
     res.json({
       success: true,
       semCelula: result.rows,
       stats: {
-        total: parseInt(total.rows[0].total),
-        comCelula: parseInt(comCelula.rows[0].total),
-        semCelula: result.rowCount,
-      },
+        total:     parseInt(s.total),
+        comCelula: parseInt(s.com_celula),
+        semCelula: parseInt(s.sem_celula),
+      }
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
