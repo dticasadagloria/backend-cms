@@ -6,8 +6,10 @@ import membroRoutes from "./routes/membroRoutes.js";
 import restauracoesRoutes from "./routes/restauracoesRoutes.js";
 import cultosRoutes from "./routes/cultosRoutes.js";
 import visitantesRoutes from "./routes/visitantesRoutes.js";
+import departamentosRoutes from "./routes/departamentosRoutes.js";
 import { query } from "./config/db.js";
 import { iniciarScheduler } from "./jobs/scheduler.js";
+
 
 // Carregar variáveis de ambiente
 dotenv.config();
@@ -61,6 +63,7 @@ app.use("/api/membros", membroRoutes);
 app.use("/api/restauracoes", restauracoesRoutes);
 app.use("/api/cultos", cultosRoutes);
 app.use("/api/visitantes", visitantesRoutes);
+app.use("/api/departamentos", departamentosRoutes);
 
 // ==================== ROTAS DE TESTE ====================
 
