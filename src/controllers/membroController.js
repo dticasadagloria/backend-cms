@@ -6,11 +6,11 @@ import {
   deactivateMembro,
   deleteMembroHard,
   reactivateMembro,
-} from '../models/membroModel.js';
+} from "../models/membroModel.js";
 
 // GET /api/membros — Listar todos
 export const getAllMembrosHandler = async (req, res) => {
-  console.log('\n GET ALL MEMBROS - User:', req.user?.username);
+  console.log("\n GET ALL MEMBROS - User:", req.user?.username);
 
   try {
     const membros = await getAllMembros();
@@ -21,10 +21,9 @@ export const getAllMembrosHandler = async (req, res) => {
       count: membros.length,
       membros,
     });
-
   } catch (error) {
-    console.error('GET MEMBROS ERROR:', error.message);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("GET MEMBROS ERROR:", error.message);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -63,7 +62,7 @@ export const createMembroHandler = async (req, res) => {
   try {
     const payload = {
       ...req.body,
-      nome: req.body.nome_membro,  // mapeia o campo
+      nome: req.body.nome_membro, // mapeia o campo
     };
     const membro = await createMembro(payload, req.user.id);
     res.status(201).json(membro);
@@ -99,21 +98,21 @@ export const createMembroHandler = async (req, res) => {
 //   }
 // };
 export const updateMembroHandler = async (req, res) => {
-  console.log('\n UPDATE MEMBRO - ID:', req.params.id);
-  console.log('Body:', req.body);
+  console.log("\n UPDATE MEMBRO - ID:", req.params.id);
+  console.log("Body:", req.body);
 
   const { id } = req.params;
 
   try {
     // Validações
     if (!req.body.nome) {
-      return res.status(400).json({ message: 'Nome é obrigatório' });
+      return res.status(400).json({ message: "Nome é obrigatório" });
     }
 
     // NORMALIZA OS DADOS antes de passar pro model
     const normalizedData = {
       codigo: req.body.codigo,
-      nome: req.body.nome || req.body.nome_membro,  // ← aceita ambos
+      nome: req.body.nome || req.body.nome_membro, // ← aceita ambos
       genero: req.body.genero,
       branch_id: req.body.branch_id,
       celula_id: req.body.celula_id,
@@ -136,41 +135,39 @@ export const updateMembroHandler = async (req, res) => {
 
     const updated = await updateMembro(id, normalizedData);
 
-    console.log('Membro updated:', updated);
+    console.log("Membro updated:", updated);
     res.status(200).json({
-      message: 'Membro actualizado com sucesso',
+      message: "Membro actualizado com sucesso",
       membro: updated,
     });
-
   } catch (error) {
-    console.error('UPDATE MEMBRO ERROR:', error.message);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("UPDATE MEMBRO ERROR:", error.message);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
 // DELETE /api/membros/:id — Desactivar
 export const deleteMembroHandler = async (req, res) => {
-  console.log('\n DELETE MEMBRO - ID:', req.params.id);
+  console.log("\n DELETE MEMBRO - ID:", req.params.id);
 
   const { id } = req.params;
 
   try {
     const existing = await findMembroById(id);
     if (!existing) {
-      return res.status(404).json({ message: 'Membro não encontrado' });
+      return res.status(404).json({ message: "Membro não encontrado" });
     }
 
     const deleted = await deactivateMembro(id);
 
-    console.log('Membro deactivated:', deleted);
+    console.log("Membro deactivated:", deleted);
     res.status(200).json({
-      message: 'Membro desactivado com sucesso',
+      message: "Membro desactivado com sucesso",
       membro: deleted,
     });
-
   } catch (error) {
-    console.error('DELETE MEMBRO ERROR:', error.message);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("DELETE MEMBRO ERROR:", error.message);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -183,48 +180,50 @@ export const getMembroByIdHandler = async (req, res) => {
 
 // ==================== DELETE (HARD DELETE) MEMBRO ====================
 export const deleteMembroHardHandler = async (req, res) => {
-  console.log('\n DELETE MEMBRO (HARD) - ID:', req.params.id);
+  console.log("\n DELETE MEMBRO (HARD) - ID:", req.params.id);
 
   const { id } = req.params;
 
   try {
     const existing = await findMembroById(id);
-    if (!existing) return res.status(404).json({ message: 'Membro não encontrado' });
+    if (!existing)
+      return res.status(404).json({ message: "Membro não encontrado" });
 
     // APAGA PERMANENTEMENTE da base de dados
     const deleted = await deleteMembroHard(id);
 
-    console.log('Membro PERMANENTLY deleted:', deleted.nome);
+    console.log("Membro PERMANENTLY deleted:", deleted.nome);
     res.status(200).json({
-      message: 'Membro eliminado permanentemente da base de dados',
+      message: "Membro eliminado permanentemente da base de dados",
       membro: deleted,
     });
   } catch (error) {
-    console.error('DELETE MEMBRO ERROR:', error.message);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("DELETE MEMBRO ERROR:", error.message);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
 // ==================== REACTIVATE MEMBRO ====================
 export const reactivateMembroHandler = async (req, res) => {
-  console.log('\n REACTIVATE MEMBRO - ID:', req.params.id);
+  console.log("\n REACTIVATE MEMBRO - ID:", req.params.id);
 
   const { id } = req.params;
 
   try {
     const existing = await findMembroById(id);
-    if (!existing) return res.status(404).json({ message: 'Membro não encontrado' });
-    if (existing.ativo) return res.status(400).json({ message: 'Membro já está activo' });
+    if (!existing)
+      return res.status(404).json({ message: "Membro não encontrado" });
+    if (existing.ativo)
+      return res.status(400).json({ message: "Membro já está activo" });
 
     const reactivated = await reactivateMembro(id);
-    console.log('Membro reactivated:', reactivated.nome);
-    res.status(200).json({ message: 'Membro reactivado', membro: reactivated });
+    console.log("Membro reactivated:", reactivated.nome);
+    res.status(200).json({ message: "Membro reactivado", membro: reactivated });
   } catch (error) {
-    console.error('REACTIVATE MEMBRO ERROR:', error.message);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("REACTIVATE MEMBRO ERROR:", error.message);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
-
 
 // ── Membros sem célula ───────────────────────────────────────────────────────
 export const membrosSemCelula = async (req, res) => {
@@ -233,7 +232,7 @@ export const membrosSemCelula = async (req, res) => {
       SELECT
         m.id,
         m.codigo,
-        m.nome_membro,
+        m.nome,
         m.contacto,
         m.email
         m.bairro
@@ -245,17 +244,21 @@ export const membrosSemCelula = async (req, res) => {
       ORDER BY m.nome_membro ASC
     `);
 
-    const total = await query(`SELECT COUNT(*) as total FROM membros WHERE ativo = true`);
-    const comCelula = await query(`SELECT COUNT(*) as total FROM membros WHERE celula_id IS NOT NULL AND ativo = true`);
+    const total = await query(
+      `SELECT COUNT(*) as total FROM membros WHERE ativo = true`,
+    );
+    const comCelula = await query(
+      `SELECT COUNT(*) as total FROM membros WHERE celula_id IS NOT NULL AND ativo = true`,
+    );
 
     res.json({
       success: true,
       semCelula: result.rows,
       stats: {
-        total:      parseInt(total.rows[0].total),
-        comCelula:  parseInt(comCelula.rows[0].total),
-        semCelula:  result.rowCount,
-      }
+        total: parseInt(total.rows[0].total),
+        comCelula: parseInt(comCelula.rows[0].total),
+        semCelula: result.rowCount,
+      },
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
