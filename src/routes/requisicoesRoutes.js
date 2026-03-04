@@ -22,6 +22,7 @@ const storage = new CloudinaryStorage({
     folder:         "iicgp/comprovativos",
     allowed_formats: ["jpg", "jpeg", "png", "pdf"],
     resource_type:  "auto",
+    type:            "upload", 
   },
 });
 const upload = multer({ storage });
