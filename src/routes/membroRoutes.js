@@ -16,7 +16,7 @@ const router = express.Router();
 
 // Todos os users autenticados podem ver
 router.get("/", authenticate, getAllMembrosHandler);
-router.get("/sem-celula", authenticate, membrosSemCelula);
+router.get("/lista/sem-celula", authenticate, membrosSemCelula);
 router.get("/:id", authenticate, getMembroByIdHandler);
 
 // Apenas Admin e Pastor podem criar/editar/deletar
