@@ -233,13 +233,11 @@ export const membrosSemCelula = async (req, res) => {
         m.id,
         m.nome,
         m.contacto,
-        m.email,
         m.codigo,
         b.nome as nome_branch
       FROM membros m
       LEFT JOIN branches b ON m.branch_id = b.id
-      WHERE m.celula_id IS NULL
-        AND m.ativo = true
+      WHERE m.celula_id IS NULL  -- ← só este filtro por agora
       ORDER BY m.nome ASC
     `);
 
@@ -249,7 +247,6 @@ export const membrosSemCelula = async (req, res) => {
         COUNT(celula_id)            as com_celula,
         COUNT(*) - COUNT(celula_id) as sem_celula
       FROM membros
-      WHERE ativo = true
     `);
 
     const s = statsResult.rows[0];
@@ -264,6 +261,7 @@ export const membrosSemCelula = async (req, res) => {
       }
     });
   } catch (err) {
+    console.error("membrosSemCelula error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
