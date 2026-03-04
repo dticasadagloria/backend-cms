@@ -68,7 +68,7 @@ export const listarRequisicoes = async (req, res) => {
       LEFT JOIN branches     b ON r.filial_id            = b.id
       LEFT JOIN departamentos d ON r.departamento_id     = d.id
       LEFT JOIN membros       m ON r.lider_solicitante_id = m.id
-      LEFT JOIN usuarios      u ON r.criado_por           = u.id
+      LEFT JOIN users      u ON r.criado_por           = u.id
       ${where}
       ORDER BY r.criado_em DESC
     `, params);
@@ -107,7 +107,7 @@ export const obterRequisicao = async (req, res) => {
     const historico = await query(`
       SELECT h.*, u.username as alterado_por_nome
       FROM requisicao_historico h
-      LEFT JOIN usuarios u ON h.alterado_por = u.id
+      LEFT JOIN users u ON h.alterado_por = u.id
       WHERE h.requisicao_id = $1
       ORDER BY h.alterado_em ASC
     `, [id]);
