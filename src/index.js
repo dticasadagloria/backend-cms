@@ -7,6 +7,7 @@ import restauracoesRoutes from "./routes/restauracoesRoutes.js";
 import cultosRoutes from "./routes/cultosRoutes.js";
 import visitantesRoutes from "./routes/visitantesRoutes.js";
 import departamentosRoutes from "./routes/departamentosRoutes.js";
+import requisicoesRoutes from "./routes/requisicoesRoutes.js";
 import { query } from "./config/db.js";
 import { iniciarScheduler } from "./jobs/scheduler.js";
 
@@ -64,6 +65,7 @@ app.use("/api/restauracoes", restauracoesRoutes);
 app.use("/api/cultos", cultosRoutes);
 app.use("/api/visitantes", visitantesRoutes);
 app.use("/api/departamentos", departamentosRoutes);
+app.use("/api/requisicoes", requisicoesRoutes);
 
 // ==================== ROTAS DE TESTE ====================
 
