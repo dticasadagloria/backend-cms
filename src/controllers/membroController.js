@@ -1,3 +1,4 @@
+import { query } from "../config/db.js";
 import {
   getAllMembros,
   createMembro,
@@ -231,13 +232,13 @@ export const membrosSemCelula = async (req, res) => {
     const result = await query(`
       SELECT
         m.id,
-        m.nome,
+        m.nome AS nome_membro,
         m.contacto,
         m.codigo,
         b.nome as nome_branch
       FROM membros m
       LEFT JOIN branches b ON m.branch_id = b.id
-      WHERE m.celula_id IS NULL  -- ← só este filtro por agora
+      WHERE m.celula_id IS NULL
       ORDER BY m.nome ASC
     `);
 
