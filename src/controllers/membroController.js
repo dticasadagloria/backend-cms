@@ -240,7 +240,7 @@ export const membrosSemCelula = async (req, res) => {
       LEFT JOIN branches b ON m.branch_id = b.id
       WHERE m.celula_id IS NULL
         AND m.ativo = true
-      ORDER BY m.nome_membro ASC
+      ORDER BY m.nome ASC
     `);
 
     const statsResult = await query(`
