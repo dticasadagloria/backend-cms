@@ -271,7 +271,7 @@ export const maisAssiduos = async (req, res) => {
     const result = await query(`
       SELECT
         m.id,
-        m.nome_membro,
+        m.nome AS nome_membro,
         b.nome as nome_branch,
         COUNT(f.id) as total_presencas
       FROM membros m
@@ -293,7 +293,7 @@ export const maisFaltas = async (req, res) => {
     const result = await query(`
       SELECT
         m.id,
-        m.nome_membro,
+        m.nome AS nome_membro,
         b.nome as nome_branch,
         COUNT(f.id) as total_faltas
       FROM membros m
