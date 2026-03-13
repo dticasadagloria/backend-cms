@@ -14,6 +14,7 @@ export const getAllMembros = async () => {
   m.batizado,
   m.data_batismo,
   m.estado_civil,
+  m.conjugue_id,
   m.ocupacao,
   COALESCE(b.nome, 'Sem Branch') AS nome_branch,  -- mostra texto padrão
   COALESCE(c.nome, 'Sem Celula') AS nome_celula,
