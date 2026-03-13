@@ -14,7 +14,7 @@ export const getAllMembros = async () => {
   m.batizado,
   m.data_batismo,
   m.estado_civil,
-  m.conjugue_id,
+  c.nome AS conjugue_nome
   m.ocupacao,
   COALESCE(b.nome, 'Sem Branch') AS nome_branch,  -- mostra texto padrão
   COALESCE(c.nome, 'Sem Celula') AS nome_celula,
@@ -32,6 +32,7 @@ export const getAllMembros = async () => {
 FROM membros m
 LEFT JOIN branches b ON m.branch_id = b.id
 LEFT JOIN celulas c ON m.celula_id = c.id
+LEFT JOIN membros c ON c.id = m.conjugue_id;
 ORDER BY m.data_registo DESC;
 
   `;
