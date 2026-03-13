@@ -271,13 +271,14 @@ export const maisAssiduos = async (req, res) => {
     const result = await query(`
       SELECT
         m.id,
-        m.nome AS nome_membro,
+        m.nome AS nome_membro,        -- ← era m.nome_membro
         b.nome as nome_branch,
         COUNT(f.id) as total_presencas
       FROM membros m
       LEFT JOIN branches b ON m.branch_id = b.id
       LEFT JOIN frequencias f ON f.membro_id = m.id AND f.presente = true
-      GROUP BY m.id, m.nome_membro, b.nome
+      WHERE m.ativo = true
+      GROUP BY m.id, m.nome, b.nome
       ORDER BY total_presencas DESC
       LIMIT 10
     `);
@@ -293,13 +294,14 @@ export const maisFaltas = async (req, res) => {
     const result = await query(`
       SELECT
         m.id,
-        m.nome AS nome_membro,
+        m.nome AS nome_membro,        -- ← era m.nome_membro
         b.nome as nome_branch,
         COUNT(f.id) as total_faltas
       FROM membros m
       LEFT JOIN branches b ON m.branch_id = b.id
       LEFT JOIN frequencias f ON f.membro_id = m.id AND f.presente = false
-      GROUP BY m.id, m.nome_membro, b.nome
+      WHERE m.ativo = true
+      GROUP BY m.id, m.nome, b.nome
       ORDER BY total_faltas DESC
       LIMIT 10
     `);
