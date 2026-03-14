@@ -10,6 +10,7 @@ import {
   uploadComprovativo,
   relatorios,
   apagarRequisicao,
+  criarRequisicaoPublica
 } from "../controllers/requisicoesController.js";
 import { authenticate, requireRole } from "../middleware/authMiddleware.js";
 
@@ -29,6 +30,9 @@ const upload = multer({ storage });
 
 const ADMIN  = 1;
 const PASTOR = 2;
+
+
+router.post("/publica", criarRequisicaoPublica);
 
 router.get("/",                    authenticate, listarRequisicoes);
 router.get("/relatorios",          authenticate, requireRole(ADMIN, PASTOR), relatorios);

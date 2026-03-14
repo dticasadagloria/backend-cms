@@ -284,3 +284,54 @@ export const relatorios = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+
+// Requisicao publica
+export const criarRequisicaoPublica = async (req, res) => {
+  const {
+    nome_solicitante, contacto, filial_id,
+    departamento_id, descricao, valor, observacoes, itens = []
+  } = req.body;
+
+  if (!nome_solicitante || !descricao || !valor || !filial_id)
+    return res.status(400).json({
+      success: false,
+      error: "Nome, descrição, valor e filial são obrigatórios"
+    });
+
+  try {
+    const result = await query(`
+      INSERT INTO requisicoes
+        (filial_id, departamento_id, descricao, valor, observacoes, status)
+      VALUES ($1, $2, $3, $4, $5, 'Em Espera')
+      RETURNING *
+    `, [filial_id, departamento_id || null, descricao, valor, observacoes]);
+
+    const requisicao = result.rows[0];
+
+    // Insere itens se existirem
+    for (const item of itens) {
+      if (item.descricao) {
+        await query(`
+          INSERT INTO requisicao_itens (requisicao_id, descricao, quantidade, valor_unitario)
+          VALUES ($1, $2, $3, $4)
+        `, [requisicao.id, item.descricao, item.quantidade || 1, item.valor_unitario || 0]);
+      }
+    }
+
+    // Historial
+    await query(`
+      INSERT INTO requisicao_historico
+        (requisicao_id, status_anterior, status_novo, observacao)
+      VALUES ($1, null, 'Em Espera', $2)
+    `, [requisicao.id, `Submetido por ${nome_solicitante} — Contacto: ${contacto || "—"}`]);
+
+    res.status(201).json({
+      success: true,
+      codigo: requisicao.codigo,
+      message: "Requisição submetida com sucesso"
+    });
+  } catch (err) {
+    console.error("criarRequisicaoPublica error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
