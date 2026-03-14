@@ -4,7 +4,7 @@ import { authenticate } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.get("/", authenticate, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const result = await query(`SELECT * FROM branches ORDER BY nome ASC`);
     res.json({ success: true, branches: result.rows });
