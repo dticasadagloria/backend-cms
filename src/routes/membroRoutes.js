@@ -11,12 +11,14 @@ import {
 } from "../controllers/membroController.js";
 import { authenticate } from "../middleware/authMiddleware.js";
 import { requireRole } from "../middleware/authMiddleware.js";
+import { lookupMembro } from "../controllers/ofertasController.js";
 
 const router = express.Router();
 
 // Todos os users autenticados podem ver
 router.get("/", authenticate, getAllMembrosHandler);
 router.get("/lista/sem-celula", authenticate, membrosSemCelula);
+router.get("/lookup", authenticate, lookupMembro); 
 router.get("/:id", authenticate, getMembroByIdHandler);
 
 // Apenas Admin e Pastor podem criar/editar/deletar
