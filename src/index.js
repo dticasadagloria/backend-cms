@@ -129,15 +129,6 @@ app.get("/test/users", async (req, res) => {
   }
 });
 
-// Rota 404
-app.use((req, res) => {
-  res.status(404).json({
-    message: "Route not found",
-    path: req.path,
-  });
-});
-
-
 //Admin post de ativo ou inativo
 app.post("/admin/verificar-presencas", async (req, res) => {
   try {
@@ -147,6 +138,17 @@ app.post("/admin/verificar-presencas", async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+// Rota 404
+app.use((req, res) => {
+  res.status(404).json({
+    message: "Route not found",
+    path: req.path,
+  });
+});
+
+
+
+
 // ==================== INICIAR SERVIDOR ====================
 
 app.listen(PORT, async () => {
@@ -167,8 +169,8 @@ app.listen(PORT, async () => {
 
   try {
     const res = await query("SELECT NOW()");
-    console.log("🟢 Database connected:", res.rows[0].now);
+    console.log("Database connected:", res.rows[0].now);
   } catch (err) {
-    console.error("🔴 Database connection error:", err.message);
+    console.error("Database connection error:", err.message);
   }
 });
