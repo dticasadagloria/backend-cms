@@ -135,6 +135,47 @@ async function getDetalhe(req, res) {
 // ─── GET /api/membros/lookup ──────────────────────────────────────────────────
 // Lookup de membro por código.
 // Query: ?codigo=M-00042
+// async function lookupMembro(req, res) {
+//   const db = req.app.locals.db;
+//   const { codigo } = req.query;
+
+//   if (!codigo) {
+//     return res.status(400).json({ message: 'Parâmetro "codigo" é obrigatório.' });
+//   }
+
+//   // O código tem formato M-XXXXX onde XXXXX é o id com zeros à esquerda
+//   const match = codigo.match(/^M-0*(\d+)$/i);
+//   if (!match) {
+//     return res.status(400).json({ message: 'Formato de código inválido. Use M-00001.' });
+//   }
+
+//   const membro_id = parseInt(match[1], 10);
+
+//   try {
+//     const result = await db.query(
+//       `SELECT id, nome, contacto, ativo FROM membros WHERE id = $1`,
+//       [membro_id]
+//     );
+//     if (result.rowCount === 0) {
+//       return res.status(404).json({ message: 'Membro não encontrado.' });
+//     }
+//     const m = result.rows[0];
+//     if (!m.ativo) {
+//       return res.status(400).json({ message: `Membro "${m.nome}" está inactivo.` });
+//     }
+//     return res.json({
+//       id: m.id,
+//       nome: m.nome,
+//       contacto: m.contacto,
+//       codigo: `M-${String(m.id).padStart(5, '0')}`,
+//     });
+//   } catch (err) {
+//     console.error('[membros/lookup] Erro:', err.message);
+//     return res.status(500).json({ message: 'Erro ao buscar membro.' });
+//   }
+// }
+// controllers/ofertasController.js  — função lookupMembro
+
 async function lookupMembro(req, res) {
   const db = req.app.locals.db;
   const { codigo } = req.query;
@@ -143,10 +184,10 @@ async function lookupMembro(req, res) {
     return res.status(400).json({ message: 'Parâmetro "codigo" é obrigatório.' });
   }
 
-  // O código tem formato M-XXXXX onde XXXXX é o id com zeros à esquerda
-  const match = codigo.match(/^M-0*(\d+)$/i);
+  // Aceita M000094 OU M-000094 (com ou sem hífen)
+  const match = codigo.match(/^M-?0*(\d+)$/i);
   if (!match) {
-    return res.status(400).json({ message: 'Formato de código inválido. Use M-00001.' });
+    return res.status(400).json({ message: 'Formato inválido. Use M000001.' });
   }
 
   const membro_id = parseInt(match[1], 10);
@@ -167,7 +208,8 @@ async function lookupMembro(req, res) {
       id: m.id,
       nome: m.nome,
       contacto: m.contacto,
-      codigo: `M-${String(m.id).padStart(5, '0')}`,
+      // Devolve no mesmo formato da view: M000094
+      codigo: `M${String(m.id).padStart(6, '0')}`,
     });
   } catch (err) {
     console.error('[membros/lookup] Erro:', err.message);
