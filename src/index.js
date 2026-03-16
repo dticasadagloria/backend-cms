@@ -9,6 +9,7 @@ import visitantesRoutes from "./routes/visitantesRoutes.js";
 import departamentosRoutes from "./routes/departamentosRoutes.js";
 import requisicoesRoutes from "./routes/requisicoesRoutes.js";
 import branchesRoutes from "./routes/branchesRoutes.js";
+import ofertasRouter from "./routes/ofertasRoutes.js";
 import { query } from "./config/db.js";
 import { iniciarScheduler } from "./jobs/scheduler.js";
 
@@ -68,6 +69,7 @@ app.use("/api/visitantes", visitantesRoutes);
 app.use("/api/departamentos", departamentosRoutes);
 app.use("/api/requisicoes", requisicoesRoutes);
 app.use("/api/branches", branchesRoutes);
+app.use('/api', ofertasRouter);
 
 // ==================== ROTAS DE TESTE ====================
 
