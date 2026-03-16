@@ -219,7 +219,7 @@ async function getHistoricoMembro(req, res) {
   }
 }
 
-module.exports = {
+export {
   batchInserir,
   getResumo,
   getDetalhe,
