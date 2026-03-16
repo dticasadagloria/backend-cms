@@ -4,6 +4,48 @@ const TIPOS_VALIDOS  = ['Dizimo', 'Shiloh', 'Parceria', 'Oferta'];
 const CANAIS_VALIDOS = ['Numerario', 'Mpesa', 'Emola', 'BIM', 'Conta Movel'];
 
 // ─── GET /api/membros/lookup?codigo=M000094 ───────────────────────────────────
+// export const lookupMembro = async (req, res) => {
+//   const { codigo } = req.query;
+
+//   if (!codigo) {
+//     return res.status(400).json({ message: 'Parâmetro "codigo" é obrigatório.' });
+//   }
+
+//   // Aceita M000094 ou M-000094 (com ou sem hífen)
+//   const match = codigo.match(/^M-?0*(\d+)$/i);
+//   if (!match) {
+//     return res.status(400).json({ message: 'Formato inválido. Use M000001.' });
+//   }
+
+//   const membro_id = parseInt(match[1], 10);
+
+//   try {
+//     const result = await query(
+//       `SELECT id, nome, contacto, ativo FROM membros WHERE id = $1`,
+//       [membro_id]
+//     );
+
+//     if (!result.rows.length) {
+//       return res.status(404).json({ message: 'Membro não encontrado.' });
+//     }
+
+//     const m = result.rows[0];
+
+//     if (!m.ativo) {
+//       return res.status(400).json({ message: `Membro "${m.nome}" está inactivo.` });
+//     }
+
+//     return res.json({
+//       id:       m.id,
+//       nome:     m.nome,
+//       contacto: m.contacto,
+//       codigo:   `M${String(m.id).padStart(6, '0')}`,
+//     });
+//   } catch (err) {
+//     console.error('[membros/lookup] Erro:', err.message);
+//     return res.status(500).json({ message: 'Erro ao buscar membro.' });
+//   }
+// };
 export const lookupMembro = async (req, res) => {
   const { codigo } = req.query;
 
@@ -11,18 +53,12 @@ export const lookupMembro = async (req, res) => {
     return res.status(400).json({ message: 'Parâmetro "codigo" é obrigatório.' });
   }
 
-  // Aceita M000094 ou M-000094 (com ou sem hífen)
-  const match = codigo.match(/^M-?0*(\d+)$/i);
-  if (!match) {
-    return res.status(400).json({ message: 'Formato inválido. Use M000001.' });
-  }
-
-  const membro_id = parseInt(match[1], 10);
-
   try {
     const result = await query(
-      `SELECT id, nome, contacto, ativo FROM membros WHERE id = $1`,
-      [membro_id]
+      `SELECT id, nome, contacto, ativo 
+       FROM membros 
+       WHERE codigo = $1`,
+      [codigo.toUpperCase()]  // M000094
     );
 
     if (!result.rows.length) {
@@ -39,7 +75,7 @@ export const lookupMembro = async (req, res) => {
       id:       m.id,
       nome:     m.nome,
       contacto: m.contacto,
-      codigo:   `M${String(m.id).padStart(6, '0')}`,
+      codigo:   codigo.toUpperCase(),
     });
   } catch (err) {
     console.error('[membros/lookup] Erro:', err.message);
