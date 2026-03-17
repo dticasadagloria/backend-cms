@@ -12,7 +12,7 @@ export const getAllMembros = async () => {
   m.bairro,
   m.faixa_etaria,
   m.batizado,
-  m.data_batismo,
+  m.ano_batismo,
   m.estado_civil,
   conjuge.nome AS conjugue_nome,
   m.ocupacao,
@@ -21,12 +21,10 @@ export const getAllMembros = async () => {
   m.ativo,
   m.ano_ingresso,
   m.escola_da_verdade,
-  m.data_conclusao_escola,
+  m.ano_conclusao_escola,
   m.contacto,
   m.email,
   m.data_registo,
-  m.tipo_documento,
-  m.numero_documento,
   m.parceiro,
   m.email
 FROM membros m
@@ -44,12 +42,13 @@ ORDER BY m.data_registo DESC;
 // Criar membro
 export const createMembro = async (membroData, userId) => {
   const text = `
-    INSERT INTO membros (codigo, nome, genero, branch_id, data_nascimento, bairro, estado_civil, faixa_etaria, batizado, data_batismo, ocupacao, ano_ingresso, escola_da_verdade, data_conclusao_escola, contacto, email, tipo_documento, numero_documento, parceiro)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+   INSERT INTO membros 
+(nome, genero, branch_id, data_nascimento, bairro, estado_civil, faixa_etaria, batizado, ocupacao, ano_ingresso, escola_da_verdade, contacto, email, ano_batismo, ano_conclusao_escola, parceiro)
+VALUES 
+($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17);
     RETURNING *
   `;
   const values = [
-    membroData.codigo,
     membroData.nome_membro,
     membroData.genero,
     membroData.branch_id,
@@ -58,16 +57,14 @@ export const createMembro = async (membroData, userId) => {
     membroData.estado_civil,
     membroData.faixa_etaria,
     membroData.batizado,
-    membroData.data_batismo,
     membroData.ocupacao,
     membroData.ano_ingresso,
     membroData.escola_da_verdade,
-    membroData.data_conclusao_escola,
     membroData.contacto,
     membroData.email,
-    membroData.tipo_documento,
-    membroData.numero_documento,
-    membroData.parceiro
+    membroData.parceiro,
+    membroData.ano_batismo,
+    membroData.ano_conclusao_escola
   ];
   const res = await query(text, values);
   return res.rows[0];
@@ -93,32 +90,28 @@ export const updateMembro = async (id, membroData) => {
   const text = `
     UPDATE membros
     SET 
-      codigo = $1,
-      nome = $2,
-      genero = $3,
-      branch_id = $4,
-      celula_id = $5,
-      data_nascimento = $6,
-      faixa_etaria = $7,
-      bairro = $8,
-      estado_civil = $9,
-      batizado = $10,
-      data_batismo = $11,
-      ocupacao = $12,
-      ano_ingresso = $13,
-      escola_da_verdade = $14,
-      data_conclusao_escola = $15,
-      contacto = $16,
-      email = $17,
-      tipo_documento = $18,
-      numero_documento = $19,
-      parceiro = $20
-    WHERE id = $21
+      nome = $1,
+      genero = $2,
+      branch_id = $3,
+      celula_id = $4,
+      data_nascimento = $5,
+      faixa_etaria = $6,
+      bairro = $7,
+      estado_civil = $8,
+      batizado = $9,
+      ano_batismo = $10,
+      ocupacao = $11,
+      ano_ingresso = $12,
+      escola_da_verdade = $13,
+      ano_conclusao_escola = $14,
+      contacto = $15,
+      email = $16,
+      parceiro = $17
+    WHERE id = $18
     RETURNING *
   `;
 
   const values = [
-    membroData.codigo || null,
     membroData.nome || null,
     membroData.genero || null,
     membroData.branch_id || null,
@@ -128,15 +121,13 @@ export const updateMembro = async (id, membroData) => {
     membroData.bairro || null,
     membroData.estado_civil || null,
     membroData.batizado || false,
-    membroData.data_batismo || null,
+    membroData.ano_batismo || null,
     membroData.ocupacao || null,
     membroData.ano_ingresso || null,
     membroData.escola_da_verdade || "Nao frequenta",
-    membroData.data_conclusao_escola || null,
+    membroData.ano_conclusao_escola || null,
     membroData.contacto || null,
     membroData.email || null,
-    membroData.tipo_documento || null,
-    membroData.numero_documento || null,
     membroData.parceiro || false,
     id
   ];

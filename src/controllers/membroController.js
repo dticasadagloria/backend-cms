@@ -29,36 +29,6 @@ export const getAllMembrosHandler = async (req, res) => {
 };
 
 // POST /api/membros — Criar novo
-// export const createMembroHandler = async (req, res) => {
-//   console.log('\n CREATE MEMBRO - User:', req.user?.username);
-
-//   const { codigo, nome, genero, branch_id } = req.body;
-
-//   try {
-//     if (!nome) {
-//       return res.status(400).json({ message: 'Nome é obrigatório' });
-//     }
-
-//     const newMembro = await createMembro(
-//       { codigo, nome, genero, branch_id },
-//       req.user.id
-//     );
-
-//     console.log('Membro created:', newMembro);
-//     res.status(201).json({
-//       message: 'Membro criado com sucesso',
-//       membro: newMembro,
-//     });
-
-//   } catch (error) {
-//     console.error('CREATE MEMBRO ERROR:', error.message);
-//     if (error.code === '23505') {
-//       return res.status(409).json({ message: 'Código já existe' });
-//     }
-//     res.status(500).json({ message: 'Internal server error' });
-//   }
-// };
-// membroController.js
 export const createMembroHandler = async (req, res) => {
   try {
     const payload = {
