@@ -42,29 +42,29 @@ ORDER BY m.data_registo DESC;
 // Criar membro
 export const createMembro = async (membroData, userId) => {
   const text = `
-   INSERT INTO membros 
-(nome, genero, branch_id, data_nascimento, bairro, estado_civil, faixa_etaria, batizado, ocupacao, ano_ingresso, escola_da_verdade, contacto, email, ano_batismo, ano_conclusao_escola, parceiro)
-VALUES 
-($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17);
+    INSERT INTO membros 
+      (nome, genero, branch_id, data_nascimento, bairro, estado_civil, faixa_etaria, batizado, ocupacao, ano_ingresso, escola_da_verdade, contacto, email, ano_batismo, ano_conclusao_escola, parceiro)
+    VALUES 
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
     RETURNING *
   `;
   const values = [
-    membroData.nome_membro,
-    membroData.genero,
-    membroData.branch_id,
-    membroData.data_nascimento,
-    membroData.bairro,
-    membroData.estado_civil,
-    membroData.faixa_etaria,
-    membroData.batizado,
-    membroData.ocupacao,
-    membroData.ano_ingresso,
-    membroData.escola_da_verdade,
-    membroData.contacto,
-    membroData.email,
-    membroData.parceiro,
-    membroData.ano_batismo,
-    membroData.ano_conclusao_escola
+    membroData.nome_membro,        // $1  nome
+    membroData.genero,             // $2  genero
+    membroData.branch_id,          // $3  branch_id
+    membroData.data_nascimento,    // $4  data_nascimento
+    membroData.bairro,             // $5  bairro
+    membroData.estado_civil,       // $6  estado_civil
+    membroData.faixa_etaria,       // $7  faixa_etaria
+    membroData.batizado,           // $8  batizado
+    membroData.ocupacao,           // $9  ocupacao
+    membroData.ano_ingresso,       // $10 ano_ingresso
+    membroData.escola_da_verdade,  // $11 escola_da_verdade
+    membroData.contacto,           // $12 contacto
+    membroData.email,              // $13 email
+    membroData.ano_batismo,        // $14 ano_batismo
+    membroData.ano_conclusao_escola, // $15 ano_conclusao_escola
+    membroData.parceiro,           // $16 parceiro
   ];
   const res = await query(text, values);
   return res.rows[0];
