@@ -190,36 +190,45 @@ export const obterPresencas = async (req, res) => {
 export const importarCSV = async (req, res) => {
   const { id: culto_id } = req.params;
   if (!req.file)
-    return res
-      .status(400)
-      .json({ success: false, error: "Nenhum ficheiro enviado" });
+    return res.status(400).json({ success: false, error: "Nenhum ficheiro enviado" });
 
   try {
     const resultados = [];
-    const stream = Readable.from(req.file.buffer.toString());
+
+    // ✅ Detecta separador automaticamente
+    const conteudo = req.file.buffer.toString();
+    const primeiraLinha = conteudo.split("\n")[0];
+    const separador = primeiraLinha.includes(";") ? ";" : ",";
+
+    console.log("📋 Primeira linha raw:", primeiraLinha);
+    console.log("📋 Separador detectado:", separador);
+
+    const stream = Readable.from(conteudo);
 
     await new Promise((resolve, reject) => {
-  stream
-    .pipe(csv({ separator: ";" })) // ← tenta ponto e vírgula
-    .on("data", (row) => resultados.push(row))
-    .on("end", resolve)
-    .on("error", reject);
-});
+      stream
+        .pipe(csv({ separator: separador }))
+        .on("data", (row) => resultados.push(row))
+        .on("end", resolve)
+        .on("error", reject);
+    });
 
-    console.log("📋 Linhas lidas do CSV:", resultados); // ← ver o que chega
+    console.log("📋 Primeira linha parseada:", resultados[0]);
+    console.log("📋 Chaves:", Object.keys(resultados[0] || {}));
 
     let importados = 0;
     for (const row of resultados) {
-      const codigo = row.codigo?.trim().replace(/\r/g, ""); // ← remove \r
+      const codigo   = row.codigo?.trim().replace(/\r/g, "");
       const presente = row.presente?.trim().toLowerCase() === "true";
 
-      console.log(`🔍 Código: "${codigo}" | Presente: ${presente}`); // ← debug
+      console.log(`🔍 Código: "${codigo}" | Presente: ${presente}`);
 
-      const membro = await query("SELECT id FROM membros WHERE codigo = $1", [
-        codigo,
-      ]);
+      const membro = await query(
+        "SELECT id FROM membros WHERE codigo = $1",
+        [codigo]
+      );
 
-      console.log(`👤 Membro encontrado:`, membro.rows); // ← ver se encontra
+      console.log(`👤 Membro encontrado:`, membro.rows);
 
       if (membro.rows.length) {
         await query(
@@ -227,7 +236,7 @@ export const importarCSV = async (req, res) => {
            VALUES ($1, $2, $3)
            ON CONFLICT (membro_id, culto_id)
            DO UPDATE SET presente = $3`,
-          [membro.rows[0].id, culto_id, presente],
+          [membro.rows[0].id, culto_id, presente]
         );
         importados++;
       }
@@ -237,19 +246,15 @@ export const importarCSV = async (req, res) => {
       `UPDATE cultos SET total_presentes = (
         SELECT COUNT(*) FROM frequencias WHERE culto_id = $1 AND presente = true
        ) WHERE id = $1`,
-      [culto_id],
+      [culto_id]
     );
 
-    res.json({
-      success: true,
-      message: `${importados} presenças importadas com sucesso`,
-    });
+    res.json({ success: true, message: `${importados} presenças importadas com sucesso` });
   } catch (err) {
     console.error("❌ importarCSV error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
-
 // ── Estatísticas gerais ──────────────────────────────────────────────────────
 export const estatisticasGerais = async (req, res) => {
   try {
