@@ -199,12 +199,12 @@ export const importarCSV = async (req, res) => {
     const stream = Readable.from(req.file.buffer.toString());
 
     await new Promise((resolve, reject) => {
-      stream
-        .pipe(csv())
-        .on("data", (row) => resultados.push(row))
-        .on("end", resolve)
-        .on("error", reject);
-    });
+  stream
+    .pipe(csv({ separator: ";" })) // ← tenta ponto e vírgula
+    .on("data", (row) => resultados.push(row))
+    .on("end", resolve)
+    .on("error", reject);
+});
 
     console.log("📋 Linhas lidas do CSV:", resultados); // ← ver o que chega
 
