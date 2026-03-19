@@ -9,7 +9,7 @@ export const criarCulto = async (req, res) => {
     const result = await query(
       `INSERT INTO cultos (branch_id, data, tipo, categoria, pregador, horario)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [branch_id, data, tipo, categoria || "Culto", pregador, horario]
+      [branch_id, data, tipo, categoria || "Culto", pregador, horario],
     );
     res.status(201).json({ success: true, culto: result.rows[0] });
   } catch (err) {
@@ -41,10 +41,12 @@ export const obterCulto = async (req, res) => {
       `SELECT c.*, b.nome as nome_branch FROM cultos c
        LEFT JOIN branches b ON c.branch_id = b.id
        WHERE c.id = $1`,
-      [id]
+      [id],
     );
     if (!result.rows.length)
-      return res.status(404).json({ success: false, error: "Culto não encontrado" });
+      return res
+        .status(404)
+        .json({ success: false, error: "Culto não encontrado" });
     res.json({ success: true, culto: result.rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -74,7 +76,7 @@ export const salvarPresencas = async (req, res) => {
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (membro_id, culto_id)
          DO UPDATE SET presente = $3, observacao = $4`,
-        [p.membro_id, culto_id, p.presente, p.observacao || null]
+        [p.membro_id, culto_id, p.presente, p.observacao || null],
       );
     }
 
@@ -83,7 +85,7 @@ export const salvarPresencas = async (req, res) => {
       `UPDATE cultos SET total_presentes = (
         SELECT COUNT(*) FROM frequencias WHERE culto_id = $1 AND presente = true
        ) WHERE id = $1`,
-      [culto_id]
+      [culto_id],
     );
 
     res.json({ success: true, message: "Presenças guardadas com sucesso" });
@@ -97,7 +99,8 @@ export const obterPresencas = async (req, res) => {
   const { id: culto_id } = req.params;
   try {
     // Todos os membros activos com a sua presença neste culto
-    const result = await query(`
+    const result = await query(
+      `
       SELECT
         m.id as membro_id,
         m.nome as nome_membro, 
@@ -111,11 +114,13 @@ export const obterPresencas = async (req, res) => {
       LEFT JOIN frequencias f ON f.membro_id = m.id AND f.culto_id = $1
       WHERE m.ativo = true
       ORDER BY m.nome ASC
-    `, [culto_id]);
+    `,
+      [culto_id],
+    );
 
-    const presentes  = result.rows.filter((r) => r.presente === true).length;
-    const ausentes   = result.rows.filter((r) => r.presente === false).length;
-    const total      = result.rows.length;
+    const presentes = result.rows.filter((r) => r.presente === true).length;
+    const ausentes = result.rows.filter((r) => r.presente === false).length;
+    const total = result.rows.length;
     const percentagem = total > 0 ? ((presentes / total) * 100).toFixed(1) : 0;
 
     res.json({
@@ -129,10 +134,65 @@ export const obterPresencas = async (req, res) => {
 };
 
 // ── Importar CSV ─────────────────────────────────────────────────────────────
+// export const importarCSV = async (req, res) => {
+//   const { id: culto_id } = req.params;
+//   if (!req.file)
+//     return res.status(400).json({ success: false, error: "Nenhum ficheiro enviado" });
+
+//   try {
+//     const resultados = [];
+//     const stream = Readable.from(req.file.buffer.toString());
+
+//     await new Promise((resolve, reject) => {
+//       stream
+//         .pipe(csv())
+//         .on("data", (row) => resultados.push(row))
+//         .on("end", resolve)
+//         .on("error", reject);
+//     });
+
+//     // CSV esperado: codigo,presente (true/false)
+//     let importados = 0;
+//     for (const row of resultados) {
+//       const codigo   = row.codigo?.trim();
+//       const presente = row.presente?.trim().toLowerCase() === "true";
+
+//       const membro = await query(
+//         "SELECT id FROM membros WHERE codigo = $1",
+//         [codigo]
+//       );
+
+//       if (membro.rows.length) {
+//         await query(
+//           `INSERT INTO frequencias (membro_id, culto_id, presente)
+//            VALUES ($1, $2, $3)
+//            ON CONFLICT (membro_id, culto_id)
+//            DO UPDATE SET presente = $3`,
+//           [membro.rows[0].id, culto_id, presente]
+//         );
+//         importados++;
+//       }
+//     }
+
+//     // Atualiza total_presentes
+//     await query(
+//       `UPDATE cultos SET total_presentes = (
+//         SELECT COUNT(*) FROM frequencias WHERE culto_id = $1 AND presente = true
+//        ) WHERE id = $1`,
+//       [culto_id]
+//     );
+
+//     res.json({ success: true, message: `${importados} presenças importadas com sucesso` });
+//   } catch (err) {
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// };
 export const importarCSV = async (req, res) => {
   const { id: culto_id } = req.params;
   if (!req.file)
-    return res.status(400).json({ success: false, error: "Nenhum ficheiro enviado" });
+    return res
+      .status(400)
+      .json({ success: false, error: "Nenhum ficheiro enviado" });
 
   try {
     const resultados = [];
@@ -146,16 +206,20 @@ export const importarCSV = async (req, res) => {
         .on("error", reject);
     });
 
-    // CSV esperado: codigo,presente (true/false)
+    console.log("📋 Linhas lidas do CSV:", resultados); // ← ver o que chega
+
     let importados = 0;
     for (const row of resultados) {
-      const codigo   = row.codigo?.trim();
+      const codigo = row.codigo?.trim().replace(/\r/g, ""); // ← remove \r
       const presente = row.presente?.trim().toLowerCase() === "true";
 
-      const membro = await query(
-        "SELECT id FROM membros WHERE codigo = $1",
-        [codigo]
-      );
+      console.log(`🔍 Código: "${codigo}" | Presente: ${presente}`); // ← debug
+
+      const membro = await query("SELECT id FROM membros WHERE codigo = $1", [
+        codigo,
+      ]);
+
+      console.log(`👤 Membro encontrado:`, membro.rows); // ← ver se encontra
 
       if (membro.rows.length) {
         await query(
@@ -163,22 +227,25 @@ export const importarCSV = async (req, res) => {
            VALUES ($1, $2, $3)
            ON CONFLICT (membro_id, culto_id)
            DO UPDATE SET presente = $3`,
-          [membro.rows[0].id, culto_id, presente]
+          [membro.rows[0].id, culto_id, presente],
         );
         importados++;
       }
     }
 
-    // Atualiza total_presentes
     await query(
       `UPDATE cultos SET total_presentes = (
         SELECT COUNT(*) FROM frequencias WHERE culto_id = $1 AND presente = true
        ) WHERE id = $1`,
-      [culto_id]
+      [culto_id],
     );
 
-    res.json({ success: true, message: `${importados} presenças importadas com sucesso` });
+    res.json({
+      success: true,
+      message: `${importados} presenças importadas com sucesso`,
+    });
   } catch (err) {
+    console.error("❌ importarCSV error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
@@ -187,8 +254,12 @@ export const importarCSV = async (req, res) => {
 export const estatisticasGerais = async (req, res) => {
   try {
     const totalCultos = await query(`SELECT COUNT(*) as total FROM cultos`);
-    const totalPresencas = await query(`SELECT COUNT(*) as total FROM frequencias WHERE presente = true`);
-    const totalMembros = await query(`SELECT COUNT(*) as total FROM membros WHERE ativo = true`);
+    const totalPresencas = await query(
+      `SELECT COUNT(*) as total FROM frequencias WHERE presente = true`,
+    );
+    const totalMembros = await query(
+      `SELECT COUNT(*) as total FROM membros WHERE ativo = true`,
+    );
     const mediaPorCulto = await query(`
       SELECT ROUND(AVG(total_presentes), 1) as media FROM cultos WHERE total_presentes > 0
     `);
@@ -196,11 +267,11 @@ export const estatisticasGerais = async (req, res) => {
     res.json({
       success: true,
       stats: {
-        totalCultos:    parseInt(totalCultos.rows[0].total),
+        totalCultos: parseInt(totalCultos.rows[0].total),
         totalPresencas: parseInt(totalPresencas.rows[0].total),
-        totalMembros:   parseInt(totalMembros.rows[0].total),
-        mediaPorCulto:  parseFloat(mediaPorCulto.rows[0].media) || 0,
-      }
+        totalMembros: parseInt(totalMembros.rows[0].total),
+        mediaPorCulto: parseFloat(mediaPorCulto.rows[0].media) || 0,
+      },
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -263,7 +334,6 @@ export const presencasPorCulto = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
-
 
 // ── Top 10 membros mais assíduos ─────────────────────────────────────────────
 export const maisAssiduos = async (req, res) => {
