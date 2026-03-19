@@ -134,68 +134,12 @@ export const obterPresencas = async (req, res) => {
 };
 
 // ── Importar CSV ─────────────────────────────────────────────────────────────
-// export const importarCSV = async (req, res) => {
-//   const { id: culto_id } = req.params;
-//   if (!req.file)
-//     return res.status(400).json({ success: false, error: "Nenhum ficheiro enviado" });
-
-//   try {
-//     const resultados = [];
-//     const stream = Readable.from(req.file.buffer.toString());
-
-//     await new Promise((resolve, reject) => {
-//       stream
-//         .pipe(csv())
-//         .on("data", (row) => resultados.push(row))
-//         .on("end", resolve)
-//         .on("error", reject);
-//     });
-
-//     // CSV esperado: codigo,presente (true/false)
-//     let importados = 0;
-//     for (const row of resultados) {
-//       const codigo   = row.codigo?.trim();
-//       const presente = row.presente?.trim().toLowerCase() === "true";
-
-//       const membro = await query(
-//         "SELECT id FROM membros WHERE codigo = $1",
-//         [codigo]
-//       );
-
-//       if (membro.rows.length) {
-//         await query(
-//           `INSERT INTO frequencias (membro_id, culto_id, presente)
-//            VALUES ($1, $2, $3)
-//            ON CONFLICT (membro_id, culto_id)
-//            DO UPDATE SET presente = $3`,
-//           [membro.rows[0].id, culto_id, presente]
-//         );
-//         importados++;
-//       }
-//     }
-
-//     // Atualiza total_presentes
-//     await query(
-//       `UPDATE cultos SET total_presentes = (
-//         SELECT COUNT(*) FROM frequencias WHERE culto_id = $1 AND presente = true
-//        ) WHERE id = $1`,
-//       [culto_id]
-//     );
-
-//     res.json({ success: true, message: `${importados} presenças importadas com sucesso` });
-//   } catch (err) {
-//     res.status(500).json({ success: false, error: err.message });
-//   }
-// };
 export const importarCSV = async (req, res) => {
   const { id: culto_id } = req.params;
   if (!req.file)
     return res.status(400).json({ success: false, error: "Nenhum ficheiro enviado" });
 
   try {
-    const resultados = [];
-
-    // ✅ Detecta separador automaticamente
     const conteudo = req.file.buffer.toString();
     const primeiraLinha = conteudo.split("\n")[0];
     const separador = primeiraLinha.includes(";") ? ";" : ",";
@@ -203,6 +147,7 @@ export const importarCSV = async (req, res) => {
     console.log("📋 Primeira linha raw:", primeiraLinha);
     console.log("📋 Separador detectado:", separador);
 
+    const resultados = [];
     const stream = Readable.from(conteudo);
 
     await new Promise((resolve, reject) => {
@@ -224,8 +169,7 @@ export const importarCSV = async (req, res) => {
       console.log(`🔍 Código: "${codigo}" | Presente: ${presente}`);
 
       const membro = await query(
-        "SELECT id FROM membros WHERE codigo = $1",
-        [codigo]
+        "SELECT id FROM membros WHERE codigo = $1", [codigo]
       );
 
       console.log(`👤 Membro encontrado:`, membro.rows);
