@@ -62,7 +62,7 @@ router.post("/login-membro", async (req, res) => {
     const token = jwt.sign(
       { id: membro.id, codigo: membro.codigo, tipo: "membro" },
       process.env.JWT_SECRET,
-      { expiresIn: "8h" },
+      { expiresIn: "1h" },
     );
 
     res.json({ token, membro }); // ← garante que retorna o membro

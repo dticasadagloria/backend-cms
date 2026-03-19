@@ -1,7 +1,7 @@
 import { query } from "../config/db.js";
 
 export const verificarPresencasMembros = async () => {
-  console.log("🔄 A verificar presenças dos membros...");
+  console.log("🔄A verificar presenças dos membros...");
 
   try {
     // ── Busca todos os cultos do último mês ──────────────────────────────
@@ -15,7 +15,7 @@ export const verificarPresencasMembros = async () => {
 
     // Se não houve cultos no último mês, não faz nada
     if (totalCultos === 0) {
-      console.log("ℹ️ Nenhum culto registado no último mês — verificação ignorada.");
+      console.log("Nenhum culto registado no último mês — verificação ignorada.");
       return;
     }
 
@@ -58,9 +58,9 @@ export const verificarPresencasMembros = async () => {
       }
     }
 
-    console.log(`✅ Verificação concluída: ${inactivados} inactivados, ${reactivados} reactivados.`);
+    console.log(`Verificação concluída: ${inactivados} inactivados, ${reactivados} reactivados.`);
 
   } catch (err) {
-    console.error("❌ Erro na verificação de presenças:", err.message);
+    console.error("Erro na verificação de presenças:", err.message);
   }
 };
