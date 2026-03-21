@@ -142,7 +142,9 @@ export const importarCSV = async (req, res) => {
   try {
     const conteudo = req.file.buffer.toString();
     const primeiraLinha = conteudo.split("\n")[0];
-    const separador = primeiraLinha.includes(";") ? ";" : ",";
+const separador = primeiraLinha.includes("\t") ? "\t" 
+                : primeiraLinha.includes(";") ? ";" 
+                : ",";
 
     console.log("📋 Primeira linha raw:", primeiraLinha);
     console.log("📋 Separador detectado:", separador);
