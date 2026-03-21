@@ -67,29 +67,48 @@ export const apagarCulto = async (req, res) => {
 // ── Salvar presenças ─────────────────────────────────────────────────────────
 export const salvarPresencas = async (req, res) => {
   const { id: culto_id } = req.params;
-  const { presencas } = req.body;
-  // presencas: [{ membro_id, presente, observacao }]
+  const { presencas }    = req.body;
+
   try {
-    for (const p of presencas) {
+    // Só processa os que estão PRESENTES
+    // Não toca nos ausentes — preserva o que outros users já marcaram
+    const presentes = presencas.filter((p) => p.presente === true);
+    const ausentes  = presencas.filter((p) => p.presente === false);
+
+    // Insere/actualiza só os presentes
+    for (const p of presentes) {
       await query(
         `INSERT INTO frequencias (membro_id, culto_id, presente, observacao)
-         VALUES ($1, $2, $3, $4)
+         VALUES ($1, $2, true, $3)
          ON CONFLICT (membro_id, culto_id)
-         DO UPDATE SET presente = $3, observacao = $4`,
-        [p.membro_id, culto_id, p.presente, p.observacao || null],
+         DO UPDATE SET presente = true, observacao = $3`,
+        [p.membro_id, culto_id, p.observacao || null]
       );
     }
 
-    // Atualiza total_presentes no culto
+    // Só marca ausente se o registo ainda NÃO existe
+    // Se já existe como presente (marcado por outro user), não toca
+    for (const p of ausentes) {
+      await query(
+        `INSERT INTO frequencias (membro_id, culto_id, presente, observacao)
+         VALUES ($1, $2, false, $3)
+         ON CONFLICT (membro_id, culto_id) DO NOTHING`,
+        // ← DO NOTHING preserva o que outro user já marcou
+        [p.membro_id, culto_id, p.observacao || null]
+      );
+    }
+
+    // Actualiza total
     await query(
       `UPDATE cultos SET total_presentes = (
         SELECT COUNT(*) FROM frequencias WHERE culto_id = $1 AND presente = true
        ) WHERE id = $1`,
-      [culto_id],
+      [culto_id]
     );
 
     res.json({ success: true, message: "Presenças guardadas com sucesso" });
   } catch (err) {
+    console.error("salvarPresencas error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
