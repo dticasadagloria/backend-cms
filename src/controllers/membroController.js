@@ -13,8 +13,11 @@ import {
 export const getAllMembrosHandler = async (req, res) => {
   console.log("\n GET ALL MEMBROS - User:", req.user?.username);
 
+  const { role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+
   try {
-    const membros = await getAllMembros();
+    const membros = await getAllMembros(isAdmin ? null : branch_id);
 
     console.log(`Returned ${membros.length} membros`);
     res.status(200).json({

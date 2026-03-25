@@ -1,41 +1,42 @@
 import { query } from '../config/db.js';
 
 // Listar todos os membros
-export const getAllMembros = async () => {
+export const getAllMembros = async (branch_id = null) => {
   const text = `
- SELECT 
-  m.id,
-  m.codigo,
-  m.nome AS nome_membro,
-  m.genero,
-  m.data_nascimento,
-  m.bairro,
-  m.faixa_etaria,
-  m.batizado,
-  m.ano_batismo,
-  m.estado_civil,
-  conjuge.nome AS conjugue_nome,
-  m.ocupacao,
-  COALESCE(b.nome, 'Sem Branch') AS nome_branch,  -- mostra texto padrão
-  COALESCE(c.nome, 'Sem Celula') AS nome_celula,
-  m.ativo,
-  m.ano_ingresso,
-  m.escola_da_verdade,
-  m.ano_conclusao_escola,
-  m.contacto,
-  m.email,
-  m.data_registo,
-  m.parceiro,
-  m.email
-FROM membros m
-LEFT JOIN branches b ON m.branch_id = b.id
-LEFT JOIN celulas c ON m.celula_id = c.id
-LEFT JOIN membros conjuge ON conjuge.id = m.conjugue_id
-ORDER BY m.data_registo DESC;
-
+    SELECT 
+      m.id,
+      m.codigo,
+      m.nome AS nome_membro,
+      m.genero,
+      m.data_nascimento,
+      m.bairro,
+      m.faixa_etaria,
+      m.batizado,
+      m.data_batismo,
+      m.estado_civil,
+      m.ocupacao,
+      COALESCE(b.nome, 'Sem Branch') AS nome_branch,
+      COALESCE(c.nome, 'Sem Celula') AS nome_celula,
+      m.ativo,
+      m.ano_ingresso,
+      m.escola_da_verdade,
+      m.data_conclusao_escola,
+      m.contacto,
+      m.email,
+      m.data_registo,
+      m.tipo_documento,
+      m.numero_documento,
+      m.parceiro,
+      m.celula_id,
+      m.branch_id
+    FROM membros m
+    LEFT JOIN branches b ON m.branch_id = b.id
+    LEFT JOIN celulas c ON m.celula_id = c.id
+    ${branch_id ? "WHERE m.branch_id = $1" : ""}
+    ORDER BY m.data_registo DESC
   `;
-  const res = await query(text);
-  console.log(res.rows);
+
+  const res = await query(text, branch_id ? [branch_id] : []);
   return res.rows;
 };
 

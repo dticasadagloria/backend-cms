@@ -93,9 +93,9 @@ export const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, username: user.username, role_id: user.role_id },
+      { id: user.id, username: user.username, role_id: user.role_id, branch_id: user.branch_id },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '3h' }
     );
 
     console.log('Login successful!\n');

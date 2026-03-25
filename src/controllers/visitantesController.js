@@ -20,10 +20,10 @@ export const registarVisitante = async (req, res) => {
   bairro,
   culto_id,
   branch_id,
-  externo ?? true,   // ✅ agora correto
+  externo ?? true, 
   igreja_origem,
   observacoes,
-  faixa_etaria       // ✅ agora no lugar certo
+  faixa_etaria       
 ]);
 
     res.status(201).json({ success: true, visitante: result.rows[0] });
