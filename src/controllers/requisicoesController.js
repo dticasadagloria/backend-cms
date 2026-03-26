@@ -44,38 +44,45 @@ export const criarRequisicao = async (req, res) => {
 
 // ── Listar requisições ───────────────────────────────────────────────────────
 export const listarRequisicoes = async (req, res) => {
+  const { role_id, branch_id: userBranch } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
   const { status, filial_id } = req.query;
+
   try {
     let conditions = [];
     let params     = [];
     let idx        = 1;
 
-    if (status)    { conditions.push(`r.status = $${idx++}`);    params.push(status); }
-    if (filial_id) { conditions.push(`r.filial_id = $${idx++}`); params.push(filial_id); }
+    // Se não é admin, força a filial do user
+    if (!isAdmin) {
+      conditions.push(`r.filial_id = $${idx++}`);
+      params.push(userBranch);
+    } else if (filial_id) {
+      conditions.push(`r.filial_id = $${idx++}`);
+      params.push(filial_id);
+    }
+
+    if (status) {
+      conditions.push(`r.status = $${idx++}`);
+      params.push(status);
+    }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const result = await query(`
-      SELECT
-        r.*,
-        b.nome    as nome_filial,
-        d.nome    as nome_departamento,
-        m.nome    as nome_solicitante,
-        u.username as criado_por_nome,
-        (SELECT COALESCE(SUM(ri.valor_total), 0)
-         FROM requisicao_itens ri WHERE ri.requisicao_id = r.id) as total_itens
+      SELECT r.*, b.nome as nome_filial, d.nome as nome_departamento,
+        m.nome as nome_solicitante, u.username as criado_por_nome
       FROM requisicoes r
-      LEFT JOIN branches     b ON r.filial_id            = b.id
-      LEFT JOIN departamentos d ON r.departamento_id     = d.id
-      LEFT JOIN membros       m ON r.lider_solicitante_id = m.id
-      LEFT JOIN users      u ON r.criado_por           = u.id
+      LEFT JOIN branches b ON r.filial_id = b.id
+      LEFT JOIN departamentos d ON r.departamento_id = d.id
+      LEFT JOIN membros m ON r.lider_solicitante_id = m.id
+      LEFT JOIN usuarios u ON r.criado_por = u.id
       ${where}
       ORDER BY r.criado_em DESC
     `, params);
 
     res.json({ success: true, requisicoes: result.rows });
   } catch (err) {
-    console.error("listarRequisicoes error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };

@@ -34,18 +34,31 @@ export const registarVisitante = async (req, res) => {
 
 // ── Listar todos os visitantes ───────────────────────────────────────────────
 export const listarVisitantes = async (req, res) => {
+  const { role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+
   try {
-    const result = await query(`
-      SELECT
-        v.*,
-        c.tipo as tipo_culto,
-        TO_CHAR(c.data, 'DD/MM/YYYY') as data_culto,
-        b.nome as nome_branch
-      FROM visitantes v
-      LEFT JOIN cultos c ON v.culto_id = c.id
-      LEFT JOIN branches b ON v.branch_id = b.id
-      ORDER BY v.data__visita DESC
-    `);
+    const result = isAdmin
+      ? await query(`
+          SELECT v.*, c.tipo as tipo_culto,
+            TO_CHAR(c.data, 'DD/MM/YYYY') as data_culto,
+            b.nome as nome_branch
+          FROM visitantes v
+          LEFT JOIN cultos c ON v.culto_id = c.id
+          LEFT JOIN branches b ON v.branch_id = b.id
+          ORDER BY v.data__visita DESC
+        `)
+      : await query(`
+          SELECT v.*, c.tipo as tipo_culto,
+            TO_CHAR(c.data, 'DD/MM/YYYY') as data_culto,
+            b.nome as nome_branch
+          FROM visitantes v
+          LEFT JOIN cultos c ON v.culto_id = c.id
+          LEFT JOIN branches b ON v.branch_id = b.id
+          WHERE v.branch_id = $1
+          ORDER BY v.data__visita DESC
+        `, [branch_id]);
+
     res.json({ success: true, visitantes: result.rows });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

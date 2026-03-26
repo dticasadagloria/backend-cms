@@ -19,14 +19,27 @@ export const criarCulto = async (req, res) => {
 
 // ── Listar cultos ────────────────────────────────────────────────────────────
 export const listarCultos = async (req, res) => {
+  const { role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+
   try {
-    const result = await query(`
-      SELECT c.*, b.nome as nome_branch,
-        (SELECT COUNT(*) FROM frequencias f WHERE f.culto_id = c.id AND f.presente = true) as total_presentes
-      FROM cultos c
-      LEFT JOIN branches b ON c.branch_id = b.id
-      ORDER BY c.data DESC
-    `);
+    const result = isAdmin
+      ? await query(`
+          SELECT c.*, b.nome as nome_branch,
+            (SELECT COUNT(*) FROM frequencias f WHERE f.culto_id = c.id AND f.presente = true) as total_presentes
+          FROM cultos c
+          LEFT JOIN branches b ON c.branch_id = b.id
+          ORDER BY c.data DESC
+        `)
+      : await query(`
+          SELECT c.*, b.nome as nome_branch,
+            (SELECT COUNT(*) FROM frequencias f WHERE f.culto_id = c.id AND f.presente = true) as total_presentes
+          FROM cultos c
+          LEFT JOIN branches b ON c.branch_id = b.id
+          WHERE c.branch_id = $1
+          ORDER BY c.data DESC
+        `, [branch_id]);
+
     res.json({ success: true, cultos: result.rows });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -116,13 +129,24 @@ export const salvarPresencas = async (req, res) => {
 // ── Obter presenças do culto ─────────────────────────────────────────────────
 export const obterPresencas = async (req, res) => {
   const { id: culto_id } = req.params;
+  const { role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+
   try {
-    // Todos os membros activos com a sua presença neste culto
-    const result = await query(
-      `
+    // Verifica se o culto pertence à filial do user
+    if (!isAdmin) {
+      const culto = await query(
+        `SELECT branch_id FROM cultos WHERE id = $1`, [culto_id]
+      );
+      if (!culto.rows.length || culto.rows[0].branch_id !== branch_id) {
+        return res.status(403).json({ success: false, error: "Sem permissão para este culto" });
+      }
+    }
+
+    const result = await query(`
       SELECT
         m.id as membro_id,
-        m.nome as nome_membro, 
+        m.nome as nome_membro,
         m.contacto,
         m.codigo,
         b.nome as nome_branch,
@@ -131,15 +155,13 @@ export const obterPresencas = async (req, res) => {
       FROM membros m
       LEFT JOIN branches b ON m.branch_id = b.id
       LEFT JOIN frequencias f ON f.membro_id = m.id AND f.culto_id = $1
-      WHERE m.ativo = true
+      ${isAdmin ? "" : "WHERE m.branch_id = $2"}
       ORDER BY m.nome ASC
-    `,
-      [culto_id],
-    );
+    `, isAdmin ? [culto_id] : [culto_id, branch_id]);
 
-    const presentes = result.rows.filter((r) => r.presente === true).length;
-    const ausentes = result.rows.filter((r) => r.presente === false).length;
-    const total = result.rows.length;
+    const presentes   = result.rows.filter((r) => r.presente === true).length;
+    const ausentes    = result.rows.filter((r) => r.presente === false).length;
+    const total       = result.rows.length;
     const percentagem = total > 0 ? ((presentes / total) * 100).toFixed(1) : 0;
 
     res.json({
@@ -148,6 +170,7 @@ export const obterPresencas = async (req, res) => {
       membros: result.rows,
     });
   } catch (err) {
+    console.error("❌ obterPresencas error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
