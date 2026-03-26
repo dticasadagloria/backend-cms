@@ -3,33 +3,32 @@ import cloudinary from "../config/cloudinary.js";
 
 // ── Criar requisição ─────────────────────────────────────────────────────────
 export const criarRequisicao = async (req, res) => {
-  const {
-    filial_id, departamento_id, lider_solicitante_id,
-    descricao, valor, observacoes, itens = []
-  } = req.body;
+  const { departamento_id, lider_solicitante_id, descricao, valor, observacoes, itens = [] } = req.body;
+  const { role_id, branch_id, id: criado_por } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
 
-  const criado_por = req.user?.id;
+  // Admin pode escolher filial, outros usam a sua
+  const filial = isAdmin ? (req.body.filial_id || branch_id) : branch_id;
 
   try {
-    // Cria a requisição
     const result = await query(`
       INSERT INTO requisicoes
         (filial_id, departamento_id, lider_solicitante_id, descricao, valor, observacoes, criado_por)
       VALUES ($1,$2,$3,$4,$5,$6,$7)
       RETURNING *
-    `, [filial_id, departamento_id, lider_solicitante_id, descricao, valor, observacoes, criado_por]);
+    `, [filial, departamento_id, lider_solicitante_id, descricao, valor, observacoes, criado_por]);
 
     const requisicao = result.rows[0];
 
-    // Insere itens se existirem
     for (const item of itens) {
-      await query(`
-        INSERT INTO requisicao_itens (requisicao_id, descricao, quantidade, valor_unitario)
-        VALUES ($1, $2, $3, $4)
-      `, [requisicao.id, item.descricao, item.quantidade, item.valor_unitario]);
+      if (item.descricao) {
+        await query(`
+          INSERT INTO requisicao_itens (requisicao_id, descricao, quantidade, valor_unitario)
+          VALUES ($1, $2, $3, $4)
+        `, [requisicao.id, item.descricao, item.quantidade || 1, item.valor_unitario || 0]);
+      }
     }
 
-    // Regista no historial
     await query(`
       INSERT INTO requisicao_historico (requisicao_id, status_anterior, status_novo, alterado_por, observacao)
       VALUES ($1, null, 'Em Espera', $2, 'Requisição criada')

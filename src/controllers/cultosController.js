@@ -4,13 +4,19 @@ import { Readable } from "stream";
 
 // ── Criar culto ──────────────────────────────────────────────────────────────
 export const criarCulto = async (req, res) => {
-  const { branch_id, data, tipo, categoria, pregador, horario } = req.body;
+  const { data, tipo, categoria, pregador, horario } = req.body;
+  const { role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+
+  // Admin pode escolher a filial, os outros usam a sua
+  const filial = isAdmin ? (req.body.branch_id || branch_id) : branch_id;
+
   try {
-    const result = await query(
-      `INSERT INTO cultos (branch_id, data, tipo, categoria, pregador, horario)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [branch_id, data, tipo, categoria || "Culto", pregador, horario],
-    );
+    const result = await query(`
+      INSERT INTO cultos (branch_id, data, tipo, categoria, pregador, horario)
+      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+    `, [filial, data, tipo, categoria || "Culto", pregador, horario]);
+
     res.status(201).json({ success: true, culto: result.rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

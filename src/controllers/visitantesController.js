@@ -2,36 +2,26 @@ import { query } from "../config/db.js";
 
 // ── Registar visitante ───────────────────────────────────────────────────────
 export const registarVisitante = async (req, res) => {
-  const {
-    nome, genero, contacto, bairro, faixa_etaria,
-    culto_id, branch_id, externo, igreja_origem, observacoes
-  } = req.body;
+  const { nome, genero, idade, contacto, bairro, culto_id, externo, igreja_origem, observacoes } = req.body;
+  const { role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+
+  const filial = isAdmin ? (req.body.branch_id || branch_id) : branch_id;
 
   try {
     const result = await query(`
-  INSERT INTO visitantes
-    (nome, genero, contacto, bairro, culto_id, branch_id, externo, igreja_origem, observacoes, faixa_etaria)
-  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-  RETURNING *
-`, [
-  nome,
-  genero,
-  contacto,
-  bairro,
-  culto_id,
-  branch_id,
-  externo ?? true, 
-  igreja_origem,
-  observacoes,
-  faixa_etaria       
-]);
+      INSERT INTO visitantes
+        (nome, genero, idade, contacto, bairro, culto_id, branch_id, externo, igreja_origem, observacoes)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      RETURNING *
+    `, [nome, genero, idade, contacto, bairro, culto_id, filial,
+        externo ?? true, igreja_origem, observacoes]);
 
     res.status(201).json({ success: true, visitante: result.rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 };
-
 // ── Listar todos os visitantes ───────────────────────────────────────────────
 export const listarVisitantes = async (req, res) => {
   const { role_id, branch_id } = req.user;

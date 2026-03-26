@@ -33,15 +33,19 @@ export const getAllMembrosHandler = async (req, res) => {
 
 // POST /api/membros — Criar novo
 export const createMembroHandler = async (req, res) => {
+  const { role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+
+  // Força branch_id do user se não for admin
+  if (!isAdmin) {
+    req.body.branch_id = branch_id;
+  }
+
   try {
-    const payload = {
-      ...req.body,
-      nome: req.body.nome_membro, // mapeia o campo
-    };
-    const membro = await createMembro(payload, req.user.id);
-    res.status(201).json(membro);
+    const membro = await createMembro(req.body);
+    res.status(201).json({ success: true, membro });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 };
 
