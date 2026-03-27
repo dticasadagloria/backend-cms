@@ -2,6 +2,18 @@ import { query } from "../config/db.js";
 import csv from "csv-parser";
 import { Readable } from "stream";
 
+
+
+function branchScope(user) {
+  const isAdmin = user.role_id === 1 || user.role_id === 2;
+  return {
+    isAdmin,
+    filter:        isAdmin ? '' : 'AND c.branch_id = $1',   // para queries com cultos
+    filterMembro:  isAdmin ? '' : 'AND m.branch_id = $1',   // para queries com membros
+    params:        isAdmin ? [] : [user.branch_id],
+  };
+}
+
 // ── Criar culto ──────────────────────────────────────────────────────────────
 export const criarCulto = async (req, res) => {
   const { data, tipo, categoria, pregador, horario } = req.body;
@@ -89,8 +101,7 @@ export const salvarPresencas = async (req, res) => {
   const { presencas }    = req.body;
 
   try {
-    // Só processa os que estão PRESENTES
-    // Não toca nos ausentes — preserva o que outros users já marcaram
+    
     const presentes = presencas.filter((p) => p.presente === true);
     const ausentes  = presencas.filter((p) => p.presente === false);
 
@@ -176,7 +187,7 @@ export const obterPresencas = async (req, res) => {
       membros: result.rows,
     });
   } catch (err) {
-    console.error("❌ obterPresencas error:", err.message);
+    console.error("obterPresencas error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
@@ -194,8 +205,8 @@ const separador = primeiraLinha.includes("\t") ? "\t"
                 : primeiraLinha.includes(";") ? ";" 
                 : ",";
 
-    console.log("📋 Primeira linha raw:", primeiraLinha);
-    console.log("📋 Separador detectado:", separador);
+    console.log("Primeira linha raw:", primeiraLinha);
+    console.log("Separador detectado:", separador);
 
     const resultados = [];
     const stream = Readable.from(conteudo);
@@ -208,21 +219,21 @@ const separador = primeiraLinha.includes("\t") ? "\t"
         .on("error", reject);
     });
 
-    console.log("📋 Primeira linha parseada:", resultados[0]);
-    console.log("📋 Chaves:", Object.keys(resultados[0] || {}));
+    console.log("Primeira linha parseada:", resultados[0]);
+    console.log("Chaves:", Object.keys(resultados[0] || {}));
 
     let importados = 0;
     for (const row of resultados) {
       const codigo   = row.codigo?.trim().replace(/\r/g, "");
       const presente = row.presente?.trim().toLowerCase() === "true";
 
-      console.log(`🔍 Código: "${codigo}" | Presente: ${presente}`);
+      console.log(`Código: "${codigo}" | Presente: ${presente}`);
 
       const membro = await query(
         "SELECT id FROM membros WHERE codigo = $1", [codigo]
       );
 
-      console.log(`👤 Membro encontrado:`, membro.rows);
+      console.log(`Membro encontrado:`, membro.rows);
 
       if (membro.rows.length) {
         await query(
@@ -245,7 +256,7 @@ const separador = primeiraLinha.includes("\t") ? "\t"
 
     res.json({ success: true, message: `${importados} presenças importadas com sucesso` });
   } catch (err) {
-    console.error("❌ importarCSV error:", err.message);
+    console.error("importarCSV error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
@@ -254,17 +265,41 @@ const separador = primeiraLinha.includes("\t") ? "\t"
 
 // ── Estatísticas gerais ──────────────────────────────────────────────────────
 export const estatisticasGerais = async (req, res) => {
+  const { role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+
   try {
-    const totalCultos = await query(`SELECT COUNT(*) as total FROM cultos`);
+    // Filtra por branch se não for admin
+    const branchFilter = isAdmin ? '' : 'WHERE branch_id = $1';
+    const branchParams = isAdmin ? [] : [branch_id];
+
+    const totalCultos = await query(
+      `SELECT COUNT(*) as total FROM cultos ${branchFilter}`,
+      branchParams
+    );
+
     const totalPresencas = await query(
-      `SELECT COUNT(*) as total FROM frequencias WHERE presente = true`,
+      `SELECT COUNT(*) as total FROM frequencias f
+       JOIN cultos c ON c.id = f.culto_id
+       ${isAdmin ? '' : 'WHERE c.branch_id = $1'}
+       AND f.presente = true`,
+      branchParams
     );
+
     const totalMembros = await query(
-      `SELECT COUNT(*) as total FROM membros WHERE ativo = true`,
+      `SELECT COUNT(*) as total FROM membros
+       ${isAdmin ? '' : 'WHERE branch_id = $1'}
+       AND ativo = true`,
+      branchParams
     );
-    const mediaPorCulto = await query(`
-      SELECT ROUND(AVG(total_presentes), 1) as media FROM cultos WHERE total_presentes > 0
-    `);
+
+    const mediaPorCulto = await query(
+      `SELECT ROUND(AVG(total_presentes), 1) as media
+       FROM cultos
+       WHERE total_presentes > 0
+       ${isAdmin ? '' : 'AND branch_id = $1'}`,
+      branchParams
+    );
 
     res.json({
       success: true,
@@ -272,135 +307,152 @@ export const estatisticasGerais = async (req, res) => {
         totalCultos: parseInt(totalCultos.rows[0].total),
         totalPresencas: parseInt(totalPresencas.rows[0].total),
         totalMembros: parseInt(totalMembros.rows[0].total),
-        mediaPorCulto: parseFloat(mediaPorCulto.rows[0].media) || 0,
+        mediaPorCulto: parseFloat(mediaPorCulto.rows[0]?.media) || 0,
       },
     });
   } catch (err) {
+    console.error('[estatisticasGerais]', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
 
 // ── Presenças por mês ────────────────────────────────────────────────────────
 export const presencasPorMes = async (req, res) => {
+  const { filter, params } = branchScope(req.user);
   try {
     const result = await query(`
       SELECT
-        TO_CHAR(c.data, 'Mon YYYY') as mes,
-        TO_CHAR(c.data, 'YYYY-MM')  as mes_ordem,
-        COUNT(DISTINCT c.id)                                          as total_cultos,
-        SUM(CASE WHEN f.presente = true  THEN 1 ELSE 0 END)          as presentes,
-        SUM(CASE WHEN f.presente = false THEN 1 ELSE 0 END)          as ausentes,
-        COUNT(f.id)                                                   as total_registos,
+        TO_CHAR(c.data, 'Mon YYYY')  AS mes,
+        TO_CHAR(c.data, 'YYYY-MM')   AS mes_ordem,
+        COUNT(DISTINCT c.id)                                          AS total_cultos,
+        SUM(CASE WHEN f.presente = true  THEN 1 ELSE 0 END)          AS presentes,
+        SUM(CASE WHEN f.presente = false THEN 1 ELSE 0 END)          AS ausentes,
+        COUNT(f.id)                                                   AS total_registos,
         ROUND(
           SUM(CASE WHEN f.presente = true THEN 1 ELSE 0 END)::numeric
           / NULLIF(COUNT(f.id), 0) * 100, 1
-        ) as taxa_presenca
+        ) AS taxa_presenca
       FROM cultos c
       LEFT JOIN frequencias f ON f.culto_id = c.id
+      WHERE 1=1 ${filter}
       GROUP BY TO_CHAR(c.data, 'Mon YYYY'), TO_CHAR(c.data, 'YYYY-MM')
       ORDER BY mes_ordem ASC
-    `);
-
+    `, params);
+ 
     res.json({ success: true, dados: result.rows });
   } catch (err) {
+    console.error('[presencasPorMes]', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
-
+ 
 // ── Presenças por culto ──────────────────────────────────────────────────────
 export const presencasPorCulto = async (req, res) => {
+  const { filter, params } = branchScope(req.user);
   try {
     const result = await query(`
       SELECT
         c.id,
         c.tipo,
         c.data,
-        TO_CHAR(c.data, 'DD/MM') as data_curta,
+        TO_CHAR(c.data, 'DD/MM')  AS data_curta,
         c.pregador,
-        COUNT(CASE WHEN f.presente = true  THEN 1 END) as presentes,
-        COUNT(CASE WHEN f.presente = false THEN 1 END) as ausentes,
-        COUNT(f.id)                                    as total,
+        COUNT(CASE WHEN f.presente = true  THEN 1 END) AS presentes,
+        COUNT(CASE WHEN f.presente = false THEN 1 END) AS ausentes,
+        COUNT(f.id)                                    AS total,
         ROUND(
           COUNT(CASE WHEN f.presente = true THEN 1 END)::numeric
           / NULLIF(COUNT(f.id), 0) * 100, 1
-        ) as taxa_presenca
+        ) AS taxa_presenca
       FROM cultos c
       LEFT JOIN frequencias f ON f.culto_id = c.id
+      WHERE 1=1 ${filter}
       GROUP BY c.id, c.tipo, c.data, c.pregador
       ORDER BY c.data DESC
       LIMIT 10
-    `);
-
+    `, params);
+ 
     res.json({ success: true, dados: result.rows });
   } catch (err) {
+    console.error('[presencasPorCulto]', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
-
+ 
 // ── Top 10 membros mais assíduos ─────────────────────────────────────────────
 export const maisAssiduos = async (req, res) => {
+  const { isAdmin, filterMembro, params } = branchScope(req.user);
   try {
     const result = await query(`
       SELECT
         m.id,
-        m.nome AS nome_membro,        -- ← era m.nome_membro
-        b.nome as nome_branch,
-        COUNT(f.id) as total_presencas
+        m.nome              AS nome_membro,
+        b.nome              AS nome_branch,
+        COUNT(f.id)         AS total_presencas
       FROM membros m
-      LEFT JOIN branches b ON m.branch_id = b.id
+      LEFT JOIN branches   b ON b.id = m.branch_id
       LEFT JOIN frequencias f ON f.membro_id = m.id AND f.presente = true
-      WHERE m.ativo = true
+      WHERE m.ativo = true ${filterMembro}
       GROUP BY m.id, m.nome, b.nome
       ORDER BY total_presencas DESC
       LIMIT 10
-    `);
+    `, params);
+ 
     res.json({ success: true, dados: result.rows });
   } catch (err) {
+    console.error('[maisAssiduos]', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
-
+ 
 // ── Top 10 membros com mais faltas ───────────────────────────────────────────
 export const maisFaltas = async (req, res) => {
+  const { filterMembro, params } = branchScope(req.user);
   try {
     const result = await query(`
       SELECT
         m.id,
-        m.nome AS nome_membro,        -- ← era m.nome_membro
-        b.nome as nome_branch,
-        COUNT(f.id) as total_faltas
+        m.nome              AS nome_membro,
+        b.nome              AS nome_branch,
+        COUNT(f.id)         AS total_faltas
       FROM membros m
-      LEFT JOIN branches b ON m.branch_id = b.id
+      LEFT JOIN branches   b ON b.id = m.branch_id
       LEFT JOIN frequencias f ON f.membro_id = m.id AND f.presente = false
-      WHERE m.ativo = true
+      WHERE m.ativo = true ${filterMembro}
       GROUP BY m.id, m.nome, b.nome
       ORDER BY total_faltas DESC
       LIMIT 10
-    `);
+    `, params);
+ 
     res.json({ success: true, dados: result.rows });
   } catch (err) {
+    console.error('[maisFaltas]', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
-
+ 
 // ── Top 10 cultos com maior afluência ────────────────────────────────────────
 export const melhorCulto = async (req, res) => {
+  const { filter, params } = branchScope(req.user);
   try {
     const result = await query(`
       SELECT
         c.id,
         c.tipo,
-        TO_CHAR(c.data, 'DD/MM/YYYY') as data_curta,
+        TO_CHAR(c.data, 'DD/MM/YYYY') AS data_curta,
         c.pregador,
-        COUNT(CASE WHEN f.presente = true THEN 1 END) as presentes
+        COUNT(CASE WHEN f.presente = true THEN 1 END) AS presentes
       FROM cultos c
       LEFT JOIN frequencias f ON f.culto_id = c.id
+      WHERE 1=1 ${filter}
       GROUP BY c.id, c.tipo, c.data, c.pregador
       ORDER BY presentes DESC
       LIMIT 10
-    `);
+    `, params);
+ 
     res.json({ success: true, dados: result.rows });
   } catch (err) {
+    console.error('[melhorCulto]', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
