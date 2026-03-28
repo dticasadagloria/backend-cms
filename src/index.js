@@ -10,6 +10,8 @@ import departamentosRoutes from "./routes/departamentosRoutes.js";
 import requisicoesRoutes from "./routes/requisicoesRoutes.js";
 import branchesRoutes from "./routes/branchesRoutes.js";
 import ofertasRouter from "./routes/ofertasRoutes.js";
+import convertidosRoutes from "./routes/convertidosRoutes.js";
+import relatoriosRoutes from "./routes/relatoriosRoutes.js";
 import { query } from "./config/db.js";
 import { iniciarScheduler } from "./jobs/scheduler.js";
 
@@ -70,6 +72,8 @@ app.use("/api/departamentos", departamentosRoutes);
 app.use("/api/requisicoes", requisicoesRoutes);
 app.use("/api/branches", branchesRoutes);
 app.use('/api', ofertasRouter);
+app.use("/api/convertidos", convertidosRoutes);
+app.use("/api/relatorios", relatoriosRoutes);
 
 // ==================== ROTAS DE TESTE ====================
 
