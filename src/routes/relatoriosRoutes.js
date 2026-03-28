@@ -215,7 +215,7 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
       </head>
       <body>
         <div class="header">
-          <h1>Igreja Internacional Casa da Glória e da Paz</h1>
+          <h1>Igreja Internacional Casa da Glória da Palavra</h1>
           <p>${titulo}</p>
         </div>
 
