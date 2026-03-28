@@ -2,7 +2,7 @@ import { query } from "../config/db.js";
 
 // ── Registar convertido ──────────────────────────────────────────────────────
 export const registarConvertido = async (req, res) => {
-  const { nome, contacto, bairro, culto_id, observacoes } = req.body;
+  const { nome, contacto, bairro, culto_id } = req.body;
   const { role_id, branch_id } = req.user;
   const isAdmin = role_id === 1 || role_id === 2;
   const filial  = isAdmin ? (req.body.branch_id || branch_id) : branch_id;
@@ -11,10 +11,10 @@ export const registarConvertido = async (req, res) => {
 
   try {
     const result = await query(`
-      INSERT INTO novos_convertidos (nome, contacto, bairro, culto_id, branch_id, observacoes)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO novos_convertidos (nome, contacto, bairro, culto_id, branch_id)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING *
-    `, [nome, contacto, bairro, culto_id, filial, observacoes]);
+    `, [nome, contacto, bairro, culto_id, filial]);
 
     res.status(201).json({ success: true, convertido: result.rows[0] });
   } catch (err) {
