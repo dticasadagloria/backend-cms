@@ -1,7 +1,7 @@
 import express from "express";
 import { query } from "../config/db.js";
 import { authenticate } from "../middleware/authMiddleware.js";
-import { gerarRelatorioPDF } from "../services/relatorioService.js";
+
 
 const router = express.Router();
 
