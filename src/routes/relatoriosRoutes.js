@@ -236,7 +236,7 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
             <div class="label">Total Presenças</div>
           </div>
           <div class="summary-card">
-            <div class="value">${visitantesPorCulto.rows.reduce((s, v) => s + parseInt(v.total || 0), 0)}</div>
+             <div class="value">${visitantesPorCulto.rows.reduce((s, v) => s + parseInt(v.total || 0), 0)}</div>
             <div class="label">Total Visitantes</div>
           </div>
           <div class="summary-card">
