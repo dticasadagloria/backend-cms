@@ -170,19 +170,32 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
       ORDER BY nc.criado_em ASC
     `, isAdmin ? [] : [branch_id]);
 
-    const visitantesPorCulto = await query(`
-      SELECT culto_id, COUNT(*) as total
-      FROM visitantes
-      ${isAdmin ? "" : "WHERE branch_id = $1"}
-      GROUP BY culto_id
-    `, isAdmin ? [] : [branch_id]);
+    // ── Visitantes com dados individuais por culto ────────────────────────────
+    const visitantes = await query(`
+      SELECT v.culto_id, v.nome, v.contacto, v.bairro
+      FROM visitantes v
+      LEFT JOIN cultos c ON v.culto_id = c.id
+      ${isAdmin
+        ? (where ? where : "")
+        : (where
+            ? `${where} AND v.branch_id = $${params.length + 1}`
+            : `WHERE v.branch_id = $1`)}
+      ORDER BY v.nome ASC
+    `, isAdmin
+        ? params
+        : [...params, branch_id]
+    ).catch(() => ({ rows: [] }));
 
-    // Gera HTML para PDF
     const titulo = mes
       ? `Relatório de Presenças — ${mes}`
       : culto_id
         ? `Relatório de Presenças — Culto`
         : "Relatório Geral de Presenças";
+
+    // Totais para os cards — por culto específico ou geral
+    const totalVisitantesCard = visitantes.rows.length;
+    const totalConvertidosCard = convertidos.rows.length;
+    const totalPresencasCard = cultos.rows.reduce((s, c) => s + parseInt(c.presentes || 0), 0);
 
     const html = `
       <!DOCTYPE html>
@@ -199,13 +212,11 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
           table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
           th { background: #fef3c7; color: #92400e; font-size: 10px; text-transform: uppercase; padding: 8px 10px; text-align: left; }
           td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px; }
-          tr:hover td { background: #fffbeb; }
           .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: bold; }
           .badge-green { background: #d1fae5; color: #065f46; }
           .badge-red   { background: #fee2e2; color: #991b1b; }
           .badge-amber { background: #fef3c7; color: #92400e; }
           .section-title { font-size: 13px; font-weight: bold; color: #1e293b; margin: 20px 0 10px; border-left: 3px solid #f59e0b; padding-left: 8px; }
-          .convertido-item { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px; }
           .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 10px; }
           .summary { display: flex; gap: 15px; margin-bottom: 20px; }
           .summary-card { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center; }
@@ -225,23 +236,23 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
           <span>Total de cultos: <strong>${cultos.rows.length}</strong></span>
         </div>
 
-        <!-- Resumo -->
+        <!-- Cards — valores filtrados pelo culto/mês seleccionado -->
         <div class="summary">
           <div class="summary-card">
             <div class="value">${cultos.rows.length}</div>
             <div class="label">Cultos</div>
           </div>
           <div class="summary-card">
-            <div class="value">${cultos.rows.reduce((s, c) => s + parseInt(c.presentes || 0), 0)}</div>
+            <div class="value">${totalPresencasCard}</div>
             <div class="label">Total Presenças</div>
           </div>
           <div class="summary-card">
-             <div class="value">${visitantesPorCulto.rows.reduce((s, v) => s + parseInt(v.total || 0), 0)}</div>
-            <div class="label">Total Visitantes</div>
+            <div class="value">${totalVisitantesCard}</div>
+            <div class="label">Visitantes${culto_id ? " neste Culto" : ""}</div>
           </div>
           <div class="summary-card">
-            <div class="value">${convertidos.rows.length}</div>
-            <div class="label">Novos Convertidos</div>
+            <div class="value">${totalConvertidosCard}</div>
+            <div class="label">Novos Convertidos${culto_id ? " neste Culto" : ""}</div>
           </div>
         </div>
 
@@ -262,7 +273,7 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
           </thead>
           <tbody>
             ${cultos.rows.map((c) => {
-              const vis  = visitantesPorCulto.rows.find((v) => v.culto_id === c.id)?.total || 0;
+              const vis  = visitantes.rows.filter((v) => v.culto_id === c.id).length;
               const conv = convertidos.rows.filter((v) => v.culto_id === c.id).length;
               return `
                 <tr>
@@ -280,33 +291,63 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
           </tbody>
         </table>
 
-        <!-- Lista de convertidos -->
-        ${convertidos.rows.length > 0 ? `
-          <div class="section-title">Novos Convertidos (${convertidos.rows.length})</div>
-          <table>
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Contacto</th>
-                <th>Bairro</th>
-                <th>Culto</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${convertidos.rows.map((c) => {
-                const culto = cultos.rows.find((cu) => cu.id === c.culto_id);
-                return `
+        <!-- Lista de visitantes por culto -->
+        ${cultos.rows.map((c) => {
+          const visDoculto = visitantes.rows.filter((v) => v.culto_id === c.id);
+          if (!visDoculto.length) return "";
+          return `
+            <div class="section-title">Visitantes — ${c.tipo} (${c.data_formatada}) — ${visDoculto.length}</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Nome</th>
+                  <th>Contacto</th>
+                  <th>Bairro</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${visDoculto.map((v, i) => `
                   <tr>
-                    <td>${c.nome}</td>
-                    <td>${c.contacto || "—"}</td>
-                    <td>${c.bairro || "—"}</td>
-                    <td>${culto ? `${culto.tipo} — ${culto.data_formatada}` : "—"}</td>
+                    <td>${i + 1}</td>
+                    <td>${v.nome}</td>
+                    <td>${v.contacto || "—"}</td>
+                    <td>${v.bairro || "—"}</td>
                   </tr>
-                `;
-              }).join("")}
-            </tbody>
-          </table>
-        ` : ""}
+                `).join("")}
+              </tbody>
+            </table>
+          `;
+        }).join("")}
+
+        <!-- Lista de convertidos por culto -->
+        ${cultos.rows.map((c) => {
+          const convDoCulto = convertidos.rows.filter((v) => v.culto_id === c.id);
+          if (!convDoCulto.length) return "";
+          return `
+            <div class="section-title">Novos Convertidos — ${c.tipo} (${c.data_formatada}) — ${convDoCulto.length}</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Nome</th>
+                  <th>Contacto</th>
+                  <th>Bairro</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${convDoCulto.map((cv, i) => `
+                  <tr>
+                    <td>${i + 1}</td>
+                    <td>${cv.nome}</td>
+                    <td>${cv.contacto || "—"}</td>
+                    <td>${cv.bairro || "—"}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          `;
+        }).join("")}
 
         <div class="footer">
           Sistema de Gestão IICGP · Relatório gerado automaticamente
