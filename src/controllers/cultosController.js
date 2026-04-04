@@ -82,6 +82,31 @@ export const obterCulto = async (req, res) => {
   }
 };
 
+
+//Editar culto 
+export const actualizarCulto = async (req, res) => {
+  const { id } = req.params;
+  const { data, tipo, categoria, pregador, horario, branch_id, inter_filial } = req.body;
+
+  try {
+    const result = await query(`
+      UPDATE cultos
+      SET data = $1, tipo = $2, categoria = $3, pregador = $4,
+          horario = $5, branch_id = $6, inter_filial = $7
+      WHERE id = $8
+      RETURNING *
+    `, [data, tipo, categoria, pregador, horario, branch_id, inter_filial, id]);
+
+    if (!result.rows.length)
+      return res.status(404).json({ success: false, error: "Culto não encontrado" });
+
+    res.json({ success: true, culto: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+
 // ── Apagar culto ─────────────────────────────────────────────────────────────
 export const apagarCulto = async (req, res) => {
   const { id } = req.params;

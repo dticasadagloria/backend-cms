@@ -8,7 +8,7 @@ import {
   obterPresencas,
   importarCSV,
   estatisticasGerais, presencasPorMes, presencasPorCulto,
-  maisAssiduos, maisFaltas, melhorCulto 
+  maisAssiduos, maisFaltas, melhorCulto, actualizarCulto 
 } from "../controllers/cultosController.js";
 import { authenticate } from "../middleware/authMiddleware.js";
 import multer from "multer";
@@ -37,5 +37,6 @@ router.post("/:id/importar", authenticate, upload.single("ficheiro"), importarCS
 
 router.get("/:id",                             authenticate, obterCulto);
 router.delete("/:id",                          authenticate, apagarCulto);
+router.put("/:id", authenticate, actualizarCulto);
 
 export default router;
