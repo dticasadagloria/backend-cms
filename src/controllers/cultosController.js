@@ -16,18 +16,16 @@ function branchScope(user) {
 
 // ── Criar culto ──────────────────────────────────────────────────────────────
 export const criarCulto = async (req, res) => {
-  const { data, tipo, categoria, pregador, horario } = req.body;
+  const { data, tipo, categoria, pregador, horario, inter_filial } = req.body;
   const { role_id, branch_id } = req.user;
   const isAdmin = role_id === 1 || role_id === 2;
-
-  // Admin pode escolher a filial, os outros usam a sua
-  const filial = isAdmin ? (req.body.branch_id || branch_id) : branch_id;
+  const filial  = isAdmin ? (req.body.branch_id || branch_id) : branch_id;
 
   try {
     const result = await query(`
-      INSERT INTO cultos (branch_id, data, tipo, categoria, pregador, horario)
-      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
-    `, [filial, data, tipo, categoria || "Culto", pregador, horario]);
+      INSERT INTO cultos (branch_id, data, tipo, categoria, pregador, horario, inter_filial)
+      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+    `, [filial, data, tipo, categoria || "Culto", pregador, horario, inter_filial || false]);
 
     res.status(201).json({ success: true, culto: result.rows[0] });
   } catch (err) {
@@ -69,7 +67,7 @@ export const obterCulto = async (req, res) => {
   const { id } = req.params;
   try {
     const result = await query(
-      `SELECT c.*, b.nome as nome_branch FROM cultos c
+      `SELECT c.*,c.inter_filial, b.nome as nome_branch FROM cultos c
        LEFT JOIN branches b ON c.branch_id = b.id
        WHERE c.id = $1`,
       [id],
@@ -150,16 +148,22 @@ export const obterPresencas = async (req, res) => {
   const isAdmin = role_id === 1 || role_id === 2;
 
   try {
-    // Verifica se o culto pertence à filial do user
-    if (!isAdmin) {
-      const culto = await query(
-        `SELECT branch_id FROM cultos WHERE id = $1`, [culto_id]
-      );
-      if (!culto.rows.length || culto.rows[0].branch_id !== branch_id) {
-        return res.status(403).json({ success: false, error: "Sem permissão para este culto" });
-      }
-    }
+    // Verifica se o culto é inter-filial
+    const cultoInfo = await query(
+      `SELECT branch_id, inter_filial FROM cultos WHERE id = $1`, [culto_id]
+    );
 
+    if (!cultoInfo.rows.length)
+      return res.status(404).json({ success: false, error: "Culto não encontrado" });
+
+    const { inter_filial, branch_id: cultoBranch } = cultoInfo.rows[0];
+
+    // Verifica permissão
+    if (!isAdmin && cultoBranch !== branch_id)
+      return res.status(403).json({ success: false, error: "Sem permissão para este culto" });
+
+    // Se inter_filial = true, busca membros de TODAS as filiais
+    // Se não, só os da filial do culto
     const result = await query(`
       SELECT
         m.id as membro_id,
@@ -172,9 +176,9 @@ export const obterPresencas = async (req, res) => {
       FROM membros m
       LEFT JOIN branches b ON m.branch_id = b.id
       LEFT JOIN frequencias f ON f.membro_id = m.id AND f.culto_id = $1
-      ${isAdmin ? "" : "WHERE m.branch_id = $2"}
-      ORDER BY m.nome ASC
-    `, isAdmin ? [culto_id] : [culto_id, branch_id]);
+      ${inter_filial ? "" : "WHERE m.branch_id = $2"}
+      ORDER BY b.nome ASC, m.nome ASC
+    `, inter_filial ? [culto_id] : [culto_id, cultoBranch]);
 
     const presentes   = result.rows.filter((r) => r.presente === true).length;
     const ausentes    = result.rows.filter((r) => r.presente === false).length;
@@ -183,6 +187,7 @@ export const obterPresencas = async (req, res) => {
 
     res.json({
       success: true,
+      inter_filial,
       stats: { total, presentes, ausentes, percentagem },
       membros: result.rows,
     });
