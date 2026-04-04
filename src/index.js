@@ -133,6 +133,16 @@ app.get("/test/users", async (req, res) => {
   }
 });
 
+//Rota de Celulas
+app.get("/api/celulas", authenticate, async (req, res) => {
+  try {
+    const result = await query(`SELECT id, nome FROM celulas ORDER BY nome ASC`);
+    res.json({ success: true, celulas: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 //Admin post de ativo ou inativo
 app.post("/admin/verificar-presencas", async (req, res) => {
   try {
