@@ -2,7 +2,6 @@ import express from "express";
 import { query } from "../config/db.js";
 import { authenticate } from "../middleware/authMiddleware.js";
 
-
 const router = express.Router();
 
 // ── Dados do relatório ────────────────────────────────────────────────────────
@@ -13,16 +12,23 @@ router.get("/presencas", authenticate, async (req, res) => {
 
   try {
     let conditions = isAdmin ? [] : [`c.branch_id = $1`];
-    let params     = isAdmin ? [] : [branch_id];
-    let idx        = params.length + 1;
+    let params = isAdmin ? [] : [branch_id];
+    let idx = params.length + 1;
 
-    if (culto_id) { conditions.push(`c.id = $${idx++}`);                               params.push(culto_id); }
-    if (mes)      { conditions.push(`TO_CHAR(c.data, 'YYYY-MM') = $${idx++}`);         params.push(mes); }
+    if (culto_id) {
+      conditions.push(`c.id = $${idx++}`);
+      params.push(culto_id);
+    }
+    if (mes) {
+      conditions.push(`TO_CHAR(c.data, 'YYYY-MM') = $${idx++}`);
+      params.push(mes);
+    }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
     // Cultos com stats
-    const cultos = await query(`
+    const cultos = await query(
+      `
       SELECT
         c.id, c.tipo, c.data, c.horario,
         TO_CHAR(c.data, 'DD/MM/YYYY') as data_formatada,
@@ -37,21 +43,30 @@ router.get("/presencas", authenticate, async (req, res) => {
       ${where}
       GROUP BY c.id, c.tipo, c.data, c.horario, b.nome
       ORDER BY c.data DESC
-    `, params);
+    `,
+      params,
+    );
 
     // Visitantes por culto
-    const visitantes = await query(`
+    const visitantes = await query(
+      `
       SELECT
         v.culto_id,
         COUNT(*) as total_visitantes
       FROM visitantes v
       LEFT JOIN cultos c ON v.culto_id = c.id
-      ${where.replace(/c\.id/g, "v.culto_id").replace(/c\.branch_id/g, "v.branch_id").replace(/TO_CHAR\(c\.data/g, "TO_CHAR(c.data")}
+      ${where
+        .replace(/c\.id/g, "v.culto_id")
+        .replace(/c\.branch_id/g, "v.branch_id")
+        .replace(/TO_CHAR\(c\.data/g, "TO_CHAR(c.data")}
       GROUP BY v.culto_id
-    `, params).catch(() => ({ rows: [] }));
+    `,
+      params,
+    ).catch(() => ({ rows: [] }));
 
     // Convertidos por culto
-    const convertidos = await query(`
+    const convertidos = await query(
+      `
       SELECT
         nc.culto_id,
         COUNT(*) as total_convertidos,
@@ -60,14 +75,20 @@ router.get("/presencas", authenticate, async (req, res) => {
       LEFT JOIN cultos c ON nc.culto_id = c.id
       ${isAdmin ? "" : `WHERE nc.branch_id = $1`}
       GROUP BY nc.culto_id
-    `, isAdmin ? [] : [branch_id]).catch(() => ({ rows: [] }));
+    `,
+      isAdmin ? [] : [branch_id],
+    ).catch(() => ({ rows: [] }));
 
     // Merge dos dados
     const dados = cultos.rows.map((c) => ({
       ...c,
-      total_visitantes: visitantes.rows.find((v) => v.culto_id === c.id)?.total_visitantes || 0,
-      total_convertidos: convertidos.rows.find((v) => v.culto_id === c.id)?.total_convertidos || 0,
-      lista_convertidos: convertidos.rows.find((v) => v.culto_id === c.id)?.lista || [],
+      total_visitantes:
+        visitantes.rows.find((v) => v.culto_id === c.id)?.total_visitantes || 0,
+      total_convertidos:
+        convertidos.rows.find((v) => v.culto_id === c.id)?.total_convertidos ||
+        0,
+      lista_convertidos:
+        convertidos.rows.find((v) => v.culto_id === c.id)?.lista || [],
     }));
 
     res.json({ success: true, dados });
@@ -85,15 +106,22 @@ router.get("/exportar/csv", authenticate, async (req, res) => {
 
   try {
     let conditions = isAdmin ? [] : [`c.branch_id = $1`];
-    let params     = isAdmin ? [] : [branch_id];
-    let idx        = params.length + 1;
+    let params = isAdmin ? [] : [branch_id];
+    let idx = params.length + 1;
 
-    if (culto_id) { conditions.push(`c.id = $${idx++}`);                       params.push(culto_id); }
-    if (mes)      { conditions.push(`TO_CHAR(c.data, 'YYYY-MM') = $${idx++}`); params.push(mes); }
+    if (culto_id) {
+      conditions.push(`c.id = $${idx++}`);
+      params.push(culto_id);
+    }
+    if (mes) {
+      conditions.push(`TO_CHAR(c.data, 'YYYY-MM') = $${idx++}`);
+      params.push(mes);
+    }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    const result = await query(`
+    const result = await query(
+      `
       SELECT
         c.tipo                          as "Tipo Culto",
         TO_CHAR(c.data, 'DD/MM/YYYY')  as "Data",
@@ -110,19 +138,24 @@ router.get("/exportar/csv", authenticate, async (req, res) => {
       ${where}
       GROUP BY c.id, c.tipo, c.data, b.nome
       ORDER BY c.data DESC
-    `, params);
+    `,
+      params,
+    );
 
     // Gera CSV
-    const headers  = Object.keys(result.rows[0] || {});
+    const headers = Object.keys(result.rows[0] || {});
     const csvLines = [
       headers.join(","),
       ...result.rows.map((row) =>
-        headers.map((h) => `"${row[h] ?? ""}"`).join(",")
+        headers.map((h) => `"${row[h] ?? ""}"`).join(","),
       ),
     ];
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="relatorio_presencas_${mes || "geral"}.csv"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="relatorio_presencas_${mes || "geral"}.csv"`,
+    );
     res.send("\uFEFF" + csvLines.join("\n")); // BOM para Excel reconhecer UTF-8
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -137,15 +170,22 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
 
   try {
     let conditions = isAdmin ? [] : [`c.branch_id = $1`];
-    let params     = isAdmin ? [] : [branch_id];
-    let idx        = params.length + 1;
+    let params = isAdmin ? [] : [branch_id];
+    let idx = params.length + 1;
 
-    if (culto_id) { conditions.push(`c.id = $${idx++}`);                       params.push(culto_id); }
-    if (mes)      { conditions.push(`TO_CHAR(c.data, 'YYYY-MM') = $${idx++}`); params.push(mes); }
+    if (culto_id) {
+      conditions.push(`c.id = $${idx++}`);
+      params.push(culto_id);
+    }
+    if (mes) {
+      conditions.push(`TO_CHAR(c.data, 'YYYY-MM') = $${idx++}`);
+      params.push(mes);
+    }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    const cultos = await query(`
+    const cultos = await query(
+      `
       SELECT
         c.id, c.tipo,
         TO_CHAR(c.data, 'DD/MM/YYYY') as data_formatada,
@@ -160,30 +200,39 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
       ${where}
       GROUP BY c.id, c.tipo, c.data, b.nome
       ORDER BY c.data DESC
-    `, params);
+    `,
+      params,
+    );
 
-    const convertidos = await query(`
+    const convertidos = await query(
+      `
       SELECT nc.culto_id, nc.nome, nc.contacto, nc.bairro
       FROM novos_convertidos nc
       LEFT JOIN cultos c ON nc.culto_id = c.id
       ${isAdmin ? "" : "WHERE nc.branch_id = $1"}
       ORDER BY nc.criado_em ASC
-    `, isAdmin ? [] : [branch_id]);
+    `,
+      isAdmin ? [] : [branch_id],
+    );
 
     // ── Visitantes com dados individuais por culto ────────────────────────────
-    const visitantes = await query(`
-      SELECT v.culto_id, v.nome, v.contacto, v.bairro
+    const visitantes = await query(
+      `
+      SELECT v.culto_id, v.nome, v.contacto, v.bairro, v.igreja_origem
       FROM visitantes v
       LEFT JOIN cultos c ON v.culto_id = c.id
-      ${isAdmin
-        ? (where ? where : "")
-        : (where
+      ${
+        isAdmin
+          ? where
+            ? where
+            : ""
+          : where
             ? `${where} AND v.branch_id = $${params.length + 1}`
-            : `WHERE v.branch_id = $1`)}
+            : `WHERE v.branch_id = $1`
+      }
       ORDER BY v.nome ASC
-    `, isAdmin
-        ? params
-        : [...params, branch_id]
+    `,
+      isAdmin ? params : [...params, branch_id],
     ).catch(() => ({ rows: [] }));
 
     const titulo = mes
@@ -195,7 +244,10 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
     // Totais para os cards — por culto específico ou geral
     const totalVisitantesCard = visitantes.rows.length;
     const totalConvertidosCard = convertidos.rows.length;
-    const totalPresencasCard = cultos.rows.reduce((s, c) => s + parseInt(c.presentes || 0), 0);
+    const totalPresencasCard = cultos.rows.reduce(
+      (s, c) => s + parseInt(c.presentes || 0),
+      0,
+    );
 
     const html = `
       <!DOCTYPE html>
@@ -272,10 +324,15 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
             </tr>
           </thead>
           <tbody>
-            ${cultos.rows.map((c) => {
-              const vis  = visitantes.rows.filter((v) => v.culto_id === c.id).length;
-              const conv = convertidos.rows.filter((v) => v.culto_id === c.id).length;
-              return `
+            ${cultos.rows
+              .map((c) => {
+                const vis = visitantes.rows.filter(
+                  (v) => v.culto_id === c.id,
+                ).length;
+                const conv = convertidos.rows.filter(
+                  (v) => v.culto_id === c.id,
+                ).length;
+                return `
                 <tr>
                   <td>${c.data_formatada}</td>
                   <td>${c.tipo}</td>
@@ -287,15 +344,19 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
                   <td><span class="badge badge-amber">${c.taxa ?? 0}%</span></td>
                 </tr>
               `;
-            }).join("")}
+              })
+              .join("")}
           </tbody>
         </table>
 
         <!-- Lista de visitantes por culto -->
-        ${cultos.rows.map((c) => {
-          const visDoculto = visitantes.rows.filter((v) => v.culto_id === c.id);
-          if (!visDoculto.length) return "";
-          return `
+        ${cultos.rows
+          .map((c) => {
+            const visDoculto = visitantes.rows.filter(
+              (v) => v.culto_id === c.id,
+            );
+            if (!visDoculto.length) return "";
+            return `
             <div class="section-title">Visitantes — ${c.tipo} (${c.data_formatada}) — ${visDoculto.length}</div>
             <table>
               <thead>
@@ -304,27 +365,37 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
                   <th>Nome</th>
                   <th>Contacto</th>
                   <th>Bairro</th>
+                  <th>Igreja Origem</th>
                 </tr>
               </thead>
               <tbody>
-                ${visDoculto.map((v, i) => `
+                ${visDoculto
+                  .map(
+                    (v, i) => `
                   <tr>
                     <td>${i + 1}</td>
                     <td>${v.nome}</td>
                     <td>${v.contacto || "—"}</td>
                     <td>${v.bairro || "—"}</td>
+                    <td>${v.igreja_origem || "—"}</td>
                   </tr>
-                `).join("")}
+                `,
+                  )
+                  .join("")}
               </tbody>
             </table>
           `;
-        }).join("")}
+          })
+          .join("")}
 
         <!-- Lista de convertidos por culto -->
-        ${cultos.rows.map((c) => {
-          const convDoCulto = convertidos.rows.filter((v) => v.culto_id === c.id);
-          if (!convDoCulto.length) return "";
-          return `
+        ${cultos.rows
+          .map((c) => {
+            const convDoCulto = convertidos.rows.filter(
+              (v) => v.culto_id === c.id,
+            );
+            if (!convDoCulto.length) return "";
+            return `
             <div class="section-title">Novos Convertidos — ${c.tipo} (${c.data_formatada}) — ${convDoCulto.length}</div>
             <table>
               <thead>
@@ -336,18 +407,23 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
                 </tr>
               </thead>
               <tbody>
-                ${convDoCulto.map((cv, i) => `
+                ${convDoCulto
+                  .map(
+                    (cv, i) => `
                   <tr>
                     <td>${i + 1}</td>
                     <td>${cv.nome}</td>
                     <td>${cv.contacto || "—"}</td>
                     <td>${cv.bairro || "—"}</td>
                   </tr>
-                `).join("")}
+                `,
+                  )
+                  .join("")}
               </tbody>
             </table>
           `;
-        }).join("")}
+          })
+          .join("")}
 
         <div class="footer">
           Sistema de Gestão IICGP · Relatório gerado automaticamente
