@@ -243,7 +243,9 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
 
     // Totais para os cards — por culto específico ou geral
     const totalVisitantesCard = visitantes.rows.length;
-    const totalConvertidosCard = convertidos.rows.length;
+    const totalConvertidosCard = convertidos.rows.filter(
+  (v) => v.culto_id === c.id
+).length;
     const totalPresencasCard = cultos.rows.reduce(
       (s, c) => s + parseInt(c.presentes || 0),
       0,
