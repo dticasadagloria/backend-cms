@@ -14,6 +14,7 @@ import convertidosRoutes from "./routes/convertidosRoutes.js";
 import relatoriosRoutes from "./routes/relatoriosRoutes.js";
 import { query } from "./config/db.js";
 import { iniciarScheduler } from "./jobs/scheduler.js";
+import { authenticate } from "./middleware/authMiddleware.js";
 
 
 // Carregar variáveis de ambiente
