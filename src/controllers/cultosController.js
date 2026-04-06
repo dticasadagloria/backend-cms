@@ -124,40 +124,31 @@ export const salvarPresencas = async (req, res) => {
   const { presencas }    = req.body;
 
   try {
-    
     const presentes = presencas.filter((p) => p.presente === true);
     const ausentes  = presencas.filter((p) => p.presente === false);
 
-    // Insere/actualiza só os presentes
-    for (const p of presentes) {
-      await query(
-        `INSERT INTO frequencias (membro_id, culto_id, presente, observacao)
-         VALUES ($1, $2, true, $3)
-         ON CONFLICT (membro_id, culto_id)
-         DO UPDATE SET presente = true, observacao = $3`,
-        [p.membro_id, culto_id, p.observacao || null]
-      );
+    if (presentes.length > 0) {
+      await query(`
+        INSERT INTO frequencias (membro_id, culto_id, presente)
+        SELECT UNNEST($1::int[]), $2, true
+        ON CONFLICT (membro_id, culto_id)
+        DO UPDATE SET presente = true
+      `, [presentes.map((p) => p.membro_id), culto_id]);
     }
 
-    // Só marca ausente se o registo ainda NÃO existe
-    // Se já existe como presente (marcado por outro user), não toca
-    for (const p of ausentes) {
-      await query(
-        `INSERT INTO frequencias (membro_id, culto_id, presente, observacao)
-         VALUES ($1, $2, false, $3)
-         ON CONFLICT (membro_id, culto_id) DO NOTHING`,
-        // ← DO NOTHING preserva o que outro user já marcou
-        [p.membro_id, culto_id, p.observacao || null]
-      );
+    if (ausentes.length > 0) {
+      await query(`
+        INSERT INTO frequencias (membro_id, culto_id, presente)
+        SELECT UNNEST($1::int[]), $2, false
+        ON CONFLICT (membro_id, culto_id) DO NOTHING
+      `, [ausentes.map((p) => p.membro_id), culto_id]);
     }
 
-    // Actualiza total
-    await query(
-      `UPDATE cultos SET total_presentes = (
+    await query(`
+      UPDATE cultos SET total_presentes = (
         SELECT COUNT(*) FROM frequencias WHERE culto_id = $1 AND presente = true
-       ) WHERE id = $1`,
-      [culto_id]
-    );
+      ) WHERE id = $1
+    `, [culto_id]);
 
     res.json({ success: true, message: "Presenças guardadas com sucesso" });
   } catch (err) {

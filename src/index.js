@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import https from "https";
 import authRoutes from "./routes/authRoutes.js";
 import membroRoutes from "./routes/membroRoutes.js";
 import restauracoesRoutes from "./routes/restauracoesRoutes.js";
@@ -22,6 +23,15 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+
+const keepAlive = () => {
+  https.get("https://iicgp-backend-cms.onrender.com/", (res) => {
+    console.log(`Keep-alive ping: ${res.statusCode}`);
+  }).on("error", () => {});
+};
+
+setInterval(keepAlive, 10 * 60 * 1000); // a cada 10 minutos
 
 // ==================== MIDDLEWARES ====================
 
