@@ -16,6 +16,7 @@ import relatoriosRoutes from "./routes/relatoriosRoutes.js";
 import { query } from "./config/db.js";
 import { iniciarScheduler } from "./jobs/scheduler.js";
 import { authenticate } from "./middleware/authMiddleware.js";
+import { verificarPresencasMembros } from "./jobs/verificarPresencas.js";
 
 
 // Carregar variáveis de ambiente
@@ -163,6 +164,8 @@ app.post("/admin/verificar-presencas", async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+
 // Rota 404
 app.use((req, res) => {
   res.status(404).json({
@@ -179,17 +182,6 @@ app.use((req, res) => {
 app.listen(PORT, async () => {
   console.log("=".repeat(60));
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log("=".repeat(60));
-  console.log("Available routes:");
-  console.log(`GET  http://localhost:${PORT}/`);
-  console.log(`POST http://localhost:${PORT}/auth/register`);
-  console.log(`POST http://localhost:${PORT}/auth/login`);
-  console.log(`GET  http://localhost:${PORT}/auth/me (requires token)`);
-  console.log(`GET  http://localhost:${PORT}/test/connection`);
-  console.log(`GET  http://localhost:${PORT}/test/roles`);
-  console.log(`GET  http://localhost:${PORT}/test/users`);
-  console.log("=".repeat(60));
-
   iniciarScheduler();
 
   try {
