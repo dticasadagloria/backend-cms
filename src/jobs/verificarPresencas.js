@@ -1,66 +1,53 @@
 import { query } from "../config/db.js";
 
 export const verificarPresencasMembros = async () => {
-  console.log("🔄A verificar presenças dos membros...");
+  console.log("A verificar presenças dos membros...");
 
   try {
-    // ── Busca todos os cultos do último mês ──────────────────────────────
     const cultosUltimoMes = await query(`
       SELECT id FROM cultos
       WHERE data >= date_trunc('month', CURRENT_DATE - INTERVAL '1 month')
         AND data <  date_trunc('month', CURRENT_DATE)
     `);
 
-    const totalCultos = cultosUltimoMes.rows.length;
-
-    // Se não houve cultos no último mês, não faz nada
-    if (totalCultos === 0) {
-      console.log("Nenhum culto registado no último mês — verificação ignorada.");
+    if (!cultosUltimoMes.rows.length) {
+      console.log("ℹNenhum culto no último mês — ignorado.");
       return;
     }
 
     const cultoIds = cultosUltimoMes.rows.map((c) => c.id);
 
-    // ── Busca todos os membros ───────────────────────────────────────────
-    const membros = await query(`SELECT id FROM membros`);
+    // ── Uma única query para inactivar quem não foi a nenhum culto ──────
+    const inactivados = await query(`
+      UPDATE membros
+      SET ativo = false
+      WHERE ativo = true
+        AND id NOT IN (
+          SELECT DISTINCT membro_id
+          FROM frequencias
+          WHERE culto_id = ANY($1::int[])
+            AND presente = true
+        )
+      RETURNING id
+    `, [cultoIds]);
 
-    let inactivados = 0;
-    let reactivados = 0;
+    // ── Uma única query para reactivar quem foi a pelo menos 1 culto ────
+    const reactivados = await query(`
+      UPDATE membros
+      SET ativo = true
+      WHERE ativo = false
+        AND id IN (
+          SELECT DISTINCT membro_id
+          FROM frequencias
+          WHERE culto_id = ANY($1::int[])
+            AND presente = true
+        )
+      RETURNING id
+    `, [cultoIds]);
 
-    for (const membro of membros.rows) {
-      // Quantas vezes esteve presente nos cultos do último mês
-      const presencas = await query(`
-        SELECT COUNT(*) as total
-        FROM frequencias
-        WHERE membro_id = $1
-          AND culto_id = ANY($2::int[])
-          AND presente = true
-      `, [membro.id, cultoIds]);
-
-      const totalPresente = parseInt(presencas.rows[0].total);
-
-      // ── Regra: ausente em TODOS os cultos do último mês → inactivo ────
-      if (totalPresente === 0) {
-        await query(
-          `UPDATE membros SET ativo = false WHERE id = $1 AND ativo = true`,
-          [membro.id]
-        );
-        inactivados++;
-      }
-
-      // ── Regra: presente em pelo menos 1 culto → activo ────────────────
-      if (totalPresente > 0) {
-        await query(
-          `UPDATE membros SET ativo = true WHERE id = $1 AND ativo = false`,
-          [membro.id]
-        );
-        reactivados++;
-      }
-    }
-
-    console.log(`Verificação concluída: ${inactivados} inactivados, ${reactivados} reactivados.`);
+    console.log(`Verificação concluída: ${inactivados.rowCount} inactivados, ${reactivados.rowCount} reactivados.`);
 
   } catch (err) {
-    console.error("Erro na verificação de presenças:", err.message);
+    console.error("Erro na verificação:", err.message);
   }
 };
