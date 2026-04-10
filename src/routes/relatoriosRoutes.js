@@ -309,6 +309,11 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
       </head>
       <body>
         <div class="header">
+        <img 
+    src="https://casadagloria-cms.vercel.app/Logo1.png" 
+    style="width: 120px; height: auto; display: block; margin: 0 auto 10px;" 
+    alt="Logo IICGP"
+  />
           <h1>Igreja Internacional Casa da Glória da Palavra</h1>
           <p>${titulo}</p>
         </div>
