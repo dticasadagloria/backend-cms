@@ -235,6 +235,34 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
       isAdmin ? params : [...params, branch_id],
     ).catch(() => ({ rows: [] }));
 
+    // ── Lista de presentes por culto ──────────────────────────────────────────────
+    const presentes = await query(
+      `
+  SELECT
+    m.nome AS nome_membro,
+    m.contacto,
+    b.nome AS nome_branch,
+    f.culto_id
+  FROM frequencias f
+  LEFT JOIN membros  m ON f.membro_id = m.id
+  LEFT JOIN branches b ON m.branch_id = b.id
+  WHERE f.presente = true
+    ${
+      isAdmin
+        ? culto_id
+          ? `AND f.culto_id = $${params.length + 1}`
+          : ""
+        : `AND f.culto_id IN (SELECT id FROM cultos WHERE branch_id = $${params.length + 1})`
+    }
+  ORDER BY m.nome ASC
+`,
+      isAdmin
+        ? culto_id
+          ? [...params, culto_id]
+          : params
+        : [...params, branch_id],
+    ).catch(() => ({ rows: [] }));
+
     const titulo = mes
       ? `Relatório de Presenças — ${mes}`
       : culto_id
@@ -244,8 +272,9 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
     // Totais para os cards — por culto específico ou geral
     const totalVisitantesCard = visitantes.rows.length;
     const totalConvertidosCard = culto_id
-  ? convertidos.rows.filter(v => String(v.culto_id) === String(culto_id)).length
-  : convertidos.rows.length;
+      ? convertidos.rows.filter((v) => String(v.culto_id) === String(culto_id))
+          .length
+      : convertidos.rows.length;
     const totalPresencasCard = cultos.rows.reduce(
       (s, c) => s + parseInt(c.presentes || 0),
       0,
@@ -259,7 +288,7 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: Arial, sans-serif; font-size: 12px; color: #1e293b; padding: 30px; }
-          .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #f59e0b; padding-bottom: 15px; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #b6852e; padding-bottom: 15px; }
           .header h1 { font-size: 20px; color: #1e293b; }
           .header p  { color: #64748b; font-size: 11px; margin-top: 4px; }
           .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 11px; color: #64748b; }
@@ -270,11 +299,11 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
           .badge-green { background: #d1fae5; color: #065f46; }
           .badge-red   { background: #fee2e2; color: #991b1b; }
           .badge-amber { background: #fef3c7; color: #92400e; }
-          .section-title { font-size: 13px; font-weight: bold; color: #1e293b; margin: 20px 0 10px; border-left: 3px solid #f59e0b; padding-left: 8px; }
+          .section-title { font-size: 13px; font-weight: bold; color: #1e293b; margin: 20px 0 10px; border-left: 3px solid #b6852e; padding-left: 8px; }
           .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 10px; }
           .summary { display: flex; gap: 15px; margin-bottom: 20px; }
           .summary-card { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center; }
-          .summary-card .value { font-size: 22px; font-weight: bold; color: #f59e0b; }
+          .summary-card .value { font-size: 22px; font-weight: bold; color: #b6852e; }
           .summary-card .label { font-size: 10px; color: #64748b; margin-top: 2px; }
         </style>
       </head>
@@ -350,6 +379,44 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
               .join("")}
           </tbody>
         </table>
+
+
+        <!-- Lista de presentes por culto -->
+${cultos.rows
+  .map((c) => {
+    const presentesDoCulto = presentes.rows.filter(
+      (p) => String(p.culto_id) === String(c.id),
+    );
+    if (!presentesDoCulto.length) return "";
+    return `
+    <div class="section-title">Presentes — ${c.tipo} (${c.data_formatada}) — ${presentesDoCulto.length}</div>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Nome</th>
+          <th>Contacto</th>
+          <th>Filial</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${presentesDoCulto
+          .map(
+            (p, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${p.nome_membro || "—"}</td>
+            <td>${p.contacto || "—"}</td>
+            <td>${p.nome_branch || "—"}</td>
+          </tr>
+        `,
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
+  })
+  .join("")}
 
         <!-- Lista de visitantes por culto -->
         ${cultos.rows
