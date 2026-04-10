@@ -236,32 +236,23 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
     ).catch(() => ({ rows: [] }));
 
     // ── Lista de presentes por culto ──────────────────────────────────────────────
-    const presentes = await query(
-      `
-  SELECT
-    m.nome AS nome_membro,
-    m.contacto,
-    b.nome AS nome_branch,
-    f.culto_id
-  FROM frequencias f
-  LEFT JOIN membros  m ON f.membro_id = m.id
-  LEFT JOIN branches b ON m.branch_id = b.id
-  WHERE f.presente = true
-    ${
-      isAdmin
-        ? culto_id
-          ? `AND f.culto_id = $${params.length + 1}`
-          : ""
-        : `AND f.culto_id IN (SELECT id FROM cultos WHERE branch_id = $${params.length + 1})`
-    }
-  ORDER BY m.nome ASC
-`,
-      isAdmin
-        ? culto_id
-          ? [...params, culto_id]
-          : params
-        : [...params, branch_id],
-    ).catch(() => ({ rows: [] }));
+const cultoIds = cultos.rows.map((c) => c.id);
+
+const presentes = cultoIds.length > 0
+  ? await query(`
+      SELECT
+        m.nome AS nome_membro,
+        m.contacto,
+        b.nome AS nome_branch,
+        f.culto_id
+      FROM frequencias f
+      LEFT JOIN membros  m ON f.membro_id = m.id
+      LEFT JOIN branches b ON m.branch_id = b.id
+      WHERE f.presente = true
+        AND f.culto_id = ANY($1::int[])
+      ORDER BY f.culto_id, m.nome ASC
+    `, [cultoIds]).catch(() => ({ rows: [] }))
+  : { rows: [] };
 
     const titulo = mes
       ? `Relatório de Presenças — ${mes}`
