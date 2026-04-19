@@ -129,48 +129,87 @@ export const converterEmMembro = async (req, res) => {
 
 // ── Relatório mensal ─────────────────────────────────────────────────────────
 export const relatorioMensal = async (req, res) => {
+  const { role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+
   try {
-    // Visitantes por mês
-    const porMes = await query(`
-      SELECT
-        TO_CHAR(data__visita, 'Mon YYYY') as mes,
-        TO_CHAR(data__visita, 'YYYY-MM')  as mes_ordem,
-        COUNT(*)                          as total,
-        COUNT(CASE WHEN externo = true  THEN 1 END) as externos,
-        COUNT(CASE WHEN externo = false THEN 1 END) as internos
-      FROM visitantes
-      GROUP BY TO_CHAR(data__visita, 'Mon YYYY'), TO_CHAR(data__visita, 'YYYY-MM')
-      ORDER BY mes_ordem ASC
-    `);
+    let porMesRaw, porCultoRaw, statsRaw;
 
-    // Visitantes por culto
-    const porCulto = await query(`
-      SELECT
-        c.tipo,
-        TO_CHAR(c.data, 'DD/MM/YYYY') as data_culto,
-        COUNT(v.id) as total_visitantes
-      FROM cultos c
-      LEFT JOIN visitantes v ON v.culto_id = c.id
-      GROUP BY c.id, c.tipo, c.data
-      ORDER BY c.data DESC
-      LIMIT 10
-    `);
+    if (isAdmin) {
+      porMesRaw = await query(`
+        SELECT
+          TO_CHAR(data__visita, 'Mon YYYY') as mes,
+          TO_CHAR(data__visita, 'YYYY-MM')  as mes_ordem,
+          COUNT(*)                          as total,
+          COUNT(CASE WHEN externo = true  THEN 1 END) as externos,
+          COUNT(CASE WHEN externo = false THEN 1 END) as internos
+        FROM visitantes
+        GROUP BY TO_CHAR(data__visita, 'Mon YYYY'), TO_CHAR(data__visita, 'YYYY-MM')
+        ORDER BY mes_ordem ASC
+      `);
 
-    // Stats gerais
-    const stats = await query(`
-      SELECT
-        COUNT(*)                                    as total,
-        COUNT(CASE WHEN externo = true  THEN 1 END) as externos,
-        COUNT(CASE WHEN externo = false THEN 1 END) as internos,
-        COUNT(CASE WHEN membro_id IS NOT NULL THEN 1 END) as convertidos
-      FROM visitantes
-    `);
+      porCultoRaw = await query(`
+        SELECT
+          c.tipo,
+          TO_CHAR(c.data, 'DD/MM/YYYY') as data_culto,
+          COUNT(v.id) as total_visitantes
+        FROM cultos c
+        LEFT JOIN visitantes v ON v.culto_id = c.id
+        GROUP BY c.id, c.tipo, c.data
+        ORDER BY c.data DESC
+        LIMIT 10
+      `);
+
+      statsRaw = await query(`
+        SELECT
+          COUNT(*)                                    as total,
+          COUNT(CASE WHEN externo = true  THEN 1 END) as externos,
+          COUNT(CASE WHEN externo = false THEN 1 END) as internos,
+          COUNT(CASE WHEN membro_id IS NOT NULL THEN 1 END) as convertidos
+        FROM visitantes
+      `);
+    } else {
+      porMesRaw = await query(`
+        SELECT
+          TO_CHAR(data__visita, 'Mon YYYY') as mes,
+          TO_CHAR(data__visita, 'YYYY-MM')  as mes_ordem,
+          COUNT(*)                          as total,
+          COUNT(CASE WHEN externo = true  THEN 1 END) as externos,
+          COUNT(CASE WHEN externo = false THEN 1 END) as internos
+        FROM visitantes
+        WHERE branch_id = $1
+        GROUP BY TO_CHAR(data__visita, 'Mon YYYY'), TO_CHAR(data__visita, 'YYYY-MM')
+        ORDER BY mes_ordem ASC
+      `, [branch_id]);
+
+      porCultoRaw = await query(`
+        SELECT
+          c.tipo,
+          TO_CHAR(c.data, 'DD/MM/YYYY') as data_culto,
+          COUNT(v.id) as total_visitantes
+        FROM cultos c
+        LEFT JOIN visitantes v ON v.culto_id = c.id AND v.branch_id = $1
+        GROUP BY c.id, c.tipo, c.data
+        ORDER BY c.data DESC
+        LIMIT 10
+      `, [branch_id]);
+
+      statsRaw = await query(`
+        SELECT
+          COUNT(*)                                    as total,
+          COUNT(CASE WHEN externo = true  THEN 1 END) as externos,
+          COUNT(CASE WHEN externo = false THEN 1 END) as internos,
+          COUNT(CASE WHEN membro_id IS NOT NULL THEN 1 END) as convertidos
+        FROM visitantes
+        WHERE branch_id = $1
+      `, [branch_id]);
+    }
 
     res.json({
       success: true,
-      stats:    stats.rows[0],
-      porMes:   porMes.rows,
-      porCulto: porCulto.rows,
+      stats:    statsRaw.rows[0],
+      porMes:   porMesRaw.rows,
+      porCulto: porCultoRaw.rows,
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
