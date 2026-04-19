@@ -189,6 +189,7 @@ export const relatorioMensal = async (req, res) => {
           COUNT(v.id) as total_visitantes
         FROM cultos c
         LEFT JOIN visitantes v ON v.culto_id = c.id AND v.branch_id = $1
+        WHERE c.branch_id = $1
         GROUP BY c.id, c.tipo, c.data
         ORDER BY c.data DESC
         LIMIT 10
