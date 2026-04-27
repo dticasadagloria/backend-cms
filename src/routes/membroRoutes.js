@@ -13,6 +13,7 @@ import { authenticate } from "../middleware/authMiddleware.js";
 import { requireRole } from "../middleware/authMiddleware.js";
 import { lookupMembro } from "../controllers/ofertasController.js";
 import { query } from "../config/db.js";
+import { inactivosTemplate } from "../templates/inactivosTemplate.js";
 
 const router = express.Router();
 
@@ -40,6 +41,60 @@ router.patch(
   requireRole(1),
   reactivateMembroHandler,
 );
+
+// ── Exportar SOS Inactivos PDF ────────────────────────────────────────────────
+router.get("/exportar/inactivos/pdf", authenticate, async (req, res) => {
+  const { username, role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+
+  try {
+    const membrosResult = await query(
+      `
+      SELECT
+        m.nome    AS nome_membro,
+        m.contacto,
+        b.nome    AS nome_branch
+      FROM membros m
+      LEFT JOIN branches b ON m.branch_id = b.id
+      WHERE m.ativo = false
+        ${!isAdmin ? "AND m.branch_id = $1" : ""}
+      ORDER BY b.nome ASC, m.nome ASC
+      `,
+      isAdmin ? [] : [branch_id],
+    );
+
+    const statsResult = await query(
+      `
+      SELECT
+        COUNT(*)                                        AS total,
+        COUNT(CASE WHEN ativo = true  THEN 1 END)       AS ativos,
+        COUNT(CASE WHEN ativo = false THEN 1 END)       AS inativos
+      FROM membros
+      ${!isAdmin ? "WHERE branch_id = $1" : ""}
+      `,
+      isAdmin ? [] : [branch_id],
+    );
+
+    const s = statsResult.rows[0];
+    const dataGeracao = new Date().toLocaleDateString("pt-MZ", {
+      day: "2-digit", month: "long", year: "numeric",
+    });
+
+    const html = inactivosTemplate(membrosResult.rows, {
+      username,
+      dataGeracao,
+      total:    parseInt(s.total),
+      ativos:   parseInt(s.ativos),
+      inativos: parseInt(s.inativos),
+    });
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
+  } catch (err) {
+    console.error("inactivos pdf error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // ── Exportar Call Center PDF ──────────────────────────────────────────────────
 router.get("/exportar/call-center/pdf", authenticate, async (req, res) => {
