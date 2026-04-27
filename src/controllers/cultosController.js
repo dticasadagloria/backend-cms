@@ -1,6 +1,7 @@
 import { query } from "../config/db.js";
 import csv from "csv-parser";
 import { Readable } from "stream";
+import { logActivity } from "../helpers/logActivity.js";
 
 
 
@@ -27,7 +28,16 @@ export const criarCulto = async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
     `, [filial, data, tipo, categoria || "Culto", pregador, horario, inter_filial || false]);
 
-    res.status(201).json({ success: true, culto: result.rows[0] });
+    const culto = result.rows[0];
+    await logActivity(req, {
+      action:       "CREATE",
+      entity_type:  "culto",
+      entity_id:    culto.id,
+      entity_label: `${culto.tipo} – ${culto.data}`,
+      new_values:   culto,
+      description:  `Criou o culto ${culto.tipo} em ${new Date(culto.data).toLocaleDateString("pt-MZ")}`,
+    });
+    res.status(201).json({ success: true, culto });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -100,7 +110,16 @@ export const actualizarCulto = async (req, res) => {
     if (!result.rows.length)
       return res.status(404).json({ success: false, error: "Culto não encontrado" });
 
-    res.json({ success: true, culto: result.rows[0] });
+    const culto = result.rows[0];
+    await logActivity(req, {
+      action:       "UPDATE",
+      entity_type:  "culto",
+      entity_id:    parseInt(id),
+      entity_label: `${culto.tipo} – ${culto.data}`,
+      new_values:   culto,
+      description:  `Actualizou o culto ${culto.tipo} (ID ${id})`,
+    });
+    res.json({ success: true, culto });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -111,7 +130,16 @@ export const actualizarCulto = async (req, res) => {
 export const apagarCulto = async (req, res) => {
   const { id } = req.params;
   try {
+    const existing = await query("SELECT tipo, data FROM cultos WHERE id = $1", [id]);
     await query("DELETE FROM cultos WHERE id = $1", [id]);
+    const c = existing.rows[0];
+    await logActivity(req, {
+      action:       "DELETE",
+      entity_type:  "culto",
+      entity_id:    parseInt(id),
+      entity_label: c ? `${c.tipo} – ${c.data}` : `ID ${id}`,
+      description:  `Apagou o culto ${c?.tipo ?? ""} (ID ${id})`,
+    });
     res.json({ success: true, message: "Culto apagado com sucesso" });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

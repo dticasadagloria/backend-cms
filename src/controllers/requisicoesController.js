@@ -1,5 +1,6 @@
 import { query } from "../config/db.js";
 import cloudinary from "../config/cloudinary.js";
+import { logActivity } from "../helpers/logActivity.js";
 
 // ── Criar requisição ─────────────────────────────────────────────────────────
 export const criarRequisicao = async (req, res) => {
@@ -34,6 +35,14 @@ export const criarRequisicao = async (req, res) => {
       VALUES ($1, null, 'Em Espera', $2, 'Requisição criada')
     `, [requisicao.id, criado_por]);
 
+    await logActivity(req, {
+      action:       "CREATE",
+      entity_type:  "requisicao",
+      entity_id:    requisicao.id,
+      entity_label: `Requisição #${requisicao.id}`,
+      new_values:   { descricao: requisicao.descricao, valor: requisicao.valor },
+      description:  `Criou a requisição #${requisicao.id}: ${requisicao.descricao}`,
+    });
     res.status(201).json({ success: true, requisicao });
   } catch (err) {
     console.error("criarRequisicao error:", err.message);
@@ -165,6 +174,15 @@ export const actualizarStatus = async (req, res) => {
       VALUES ($1, $2, $3, $4, $5)
     `, [id, status_anterior, status, alterado_por, observacao || null]);
 
+    await logActivity(req, {
+      action:       "STATUS_CHANGE",
+      entity_type:  "requisicao",
+      entity_id:    parseInt(id),
+      entity_label: `Requisição #${id}`,
+      old_values:   { status: status_anterior },
+      new_values:   { status },
+      description:  `Alterou o status da requisição #${id}: ${status_anterior} → ${status}`,
+    });
     res.json({ success: true, message: `Requisição ${status} com sucesso` });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -205,6 +223,13 @@ export const apagarRequisicao = async (req, res) => {
     }
 
     await query(`DELETE FROM requisicoes WHERE id = $1`, [id]);
+    await logActivity(req, {
+      action:       "DELETE",
+      entity_type:  "requisicao",
+      entity_id:    parseInt(id),
+      entity_label: `Requisição #${id}`,
+      description:  `Apagou a requisição #${id}`,
+    });
     res.json({ success: true, message: "Requisição apagada com sucesso" });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

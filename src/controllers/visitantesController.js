@@ -1,4 +1,5 @@
 import { query } from "../config/db.js";
+import { logActivity } from "../helpers/logActivity.js";
 
 // ── Registar visitante ───────────────────────────────────────────────────────
 export const registarVisitante = async (req, res) => {
@@ -17,7 +18,16 @@ export const registarVisitante = async (req, res) => {
     `, [nome, genero, faixa_etaria, contacto, bairro, culto_id, filial,
         externo ?? true, igreja_origem, observacoes]);
 
-    res.status(201).json({ success: true, visitante: result.rows[0] });
+    const visitante = result.rows[0];
+    await logActivity(req, {
+      action:       "CREATE",
+      entity_type:  "visitante",
+      entity_id:    visitante.id,
+      entity_label: visitante.nome,
+      new_values:   visitante,
+      description:  `Registou o visitante ${visitante.nome}`,
+    });
+    res.status(201).json({ success: true, visitante });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -77,7 +87,16 @@ export const visitantesPorCulto = async (req, res) => {
 export const apagarVisitante = async (req, res) => {
   const { id } = req.params;
   try {
+    const existing = await query("SELECT nome FROM visitantes WHERE id = $1", [id]);
     await query("DELETE FROM visitantes WHERE id = $1", [id]);
+    const nome = existing.rows[0]?.nome ?? `ID ${id}`;
+    await logActivity(req, {
+      action:       "DELETE",
+      entity_type:  "visitante",
+      entity_id:    parseInt(id),
+      entity_label: nome,
+      description:  `Apagou o visitante ${nome}`,
+    });
     res.json({ success: true, message: "Visitante apagado com sucesso" });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -121,7 +140,15 @@ export const converterEmMembro = async (req, res) => {
       [novoMembro.rows[0].id, id]
     );
 
-    res.json({ success: true, membro: novoMembro.rows[0] });
+    const membro = novoMembro.rows[0];
+    await logActivity(req, {
+      action:       "STATUS_CHANGE",
+      entity_type:  "visitante",
+      entity_id:    parseInt(id),
+      entity_label: v.nome,
+      description:  `Converteu o visitante ${v.nome} em membro`,
+    });
+    res.json({ success: true, membro });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

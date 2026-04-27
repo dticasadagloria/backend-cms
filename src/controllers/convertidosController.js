@@ -1,4 +1,5 @@
 import { query } from "../config/db.js";
+import { logActivity } from "../helpers/logActivity.js";
 
 // ── Registar convertido ──────────────────────────────────────────────────────
 export const registarConvertido = async (req, res) => {
@@ -16,7 +17,16 @@ export const registarConvertido = async (req, res) => {
       RETURNING *
     `, [nome, contacto, bairro, culto_id, filial]);
 
-    res.status(201).json({ success: true, convertido: result.rows[0] });
+    const convertido = result.rows[0];
+    await logActivity(req, {
+      action:       "CREATE",
+      entity_type:  "convertido",
+      entity_id:    convertido.id,
+      entity_label: convertido.nome,
+      new_values:   convertido,
+      description:  `Registou o novo convertido ${convertido.nome}`,
+    });
+    res.status(201).json({ success: true, convertido });
   } catch (err) {
     console.error("registarConvertido error:", err.message);
     res.status(500).json({ success: false, error: err.message });
@@ -62,7 +72,16 @@ export const listarConvertidos = async (req, res) => {
 export const apagarConvertido = async (req, res) => {
   const { id } = req.params;
   try {
+    const existing = await query(`SELECT nome FROM novos_convertidos WHERE id = $1`, [id]);
     await query(`DELETE FROM novos_convertidos WHERE id = $1`, [id]);
+    const nome = existing.rows[0]?.nome ?? `ID ${id}`;
+    await logActivity(req, {
+      action:       "DELETE",
+      entity_type:  "convertido",
+      entity_id:    parseInt(id),
+      entity_label: nome,
+      description:  `Apagou o convertido ${nome}`,
+    });
     res.json({ success: true, message: "Convertido apagado com sucesso" });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
