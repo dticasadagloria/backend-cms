@@ -2,25 +2,24 @@ import jwt from 'jsonwebtoken';
 
 export const authenticate = (req, res, next) => {
   try {
-    // Pegar token do header Authorization
+    // Suporta token via header Authorization ou query param ?token=... (para window.open downloads)
     const authHeader = req.headers.authorization;
+    const queryToken = req.query.token;
 
-    if (!authHeader) {
-      return res.status(401).json({ 
-        message: 'No token provided' 
-      });
+    let token;
+    if (authHeader) {
+      const parts = authHeader.split(' ');
+      if (parts.length !== 2 || parts[0] !== 'Bearer') {
+        return res.status(401).json({
+          message: 'Token format invalid. Use: Bearer <token>',
+        });
+      }
+      token = parts[1];
+    } else if (queryToken) {
+      token = queryToken;
+    } else {
+      return res.status(401).json({ message: 'No token provided' });
     }
-
-    // Format: "Bearer TOKEN"
-    const parts = authHeader.split(' ');
-    
-    if (parts.length !== 2 || parts[0] !== 'Bearer') {
-      return res.status(401).json({ 
-        message: 'Token format invalid. Use: Bearer <token>' 
-      });
-    }
-
-    const token = parts[1];
 
     // Verificar token
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
