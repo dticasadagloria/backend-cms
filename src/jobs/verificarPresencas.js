@@ -31,19 +31,21 @@ export const verificarPresencasMembros = async () => {
       RETURNING id
     `, [cultoIds]);
 
-    // ── Uma única query para reactivar quem foi a pelo menos 1 culto ────
+    // ── Reactivar quem foi a TODOS os cultos do último mês ──────────────
     const reactivados = await query(`
       UPDATE membros
       SET ativo = true
       WHERE ativo = false
         AND id IN (
-          SELECT DISTINCT membro_id
+          SELECT membro_id
           FROM frequencias
           WHERE culto_id = ANY($1::int[])
             AND presente = true
+          GROUP BY membro_id
+          HAVING COUNT(DISTINCT culto_id) = $2
         )
       RETURNING id
-    `, [cultoIds]);
+    `, [cultoIds, cultoIds.length]);
 
     console.log(`Verificação concluída: ${inactivados.rowCount} inactivados, ${reactivados.rowCount} reactivados.`);
 
