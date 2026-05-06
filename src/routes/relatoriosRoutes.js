@@ -2,6 +2,7 @@ import express from "express";
 import { query } from "../config/db.js";
 import { authenticate } from "../middleware/authMiddleware.js";
 import { gerarPresencasHTML } from "../templates/presencasTemplate.js";
+import { gerarFichaOfertasHTML } from "../templates/fichaOfertas.js";
 
 const router = express.Router();
 
@@ -251,6 +252,106 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(html);
   } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── Ofertas: dados resumidos por culto ────────────────────────────────────────
+router.get("/ofertas/dados/:culto_id", authenticate, async (req, res) => {
+  const { culto_id } = req.params;
+  try {
+    const cultoRes = await query(
+      `SELECT c.id, c.tipo, TO_CHAR(c.data, 'DD/MM/YYYY') AS data_formatada, c.horario, b.nome AS filial
+       FROM cultos c LEFT JOIN branches b ON b.id = c.branch_id WHERE c.id = $1`,
+      [culto_id],
+    );
+    if (!cultoRes.rows.length)
+      return res.status(404).json({ message: "Culto não encontrado." });
+
+    const ofertasRes = await query(
+      `SELECT * FROM v_detalhe_ofertas WHERE culto_id = $1 ORDER BY tipo, data_registo`,
+      [culto_id],
+    );
+    res.json({ culto: cultoRes.rows[0], ofertas: ofertasRes.rows });
+  } catch (err) {
+    console.error("ofertas/dados error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── Ofertas: exportar PDF (HTML para impressão) ───────────────────────────────
+router.get("/ofertas/pdf/:culto_id", authenticate, async (req, res) => {
+  const { culto_id } = req.params;
+  const { username }  = req.user;
+  try {
+    const cultoRes = await query(
+      `SELECT c.id, c.tipo, TO_CHAR(c.data, 'DD/MM/YYYY') AS data_formatada, c.horario, b.nome AS filial
+       FROM cultos c LEFT JOIN branches b ON b.id = c.branch_id WHERE c.id = $1`,
+      [culto_id],
+    );
+    if (!cultoRes.rows.length)
+      return res.status(404).json({ message: "Culto não encontrado." });
+
+    const ofertasRes = await query(
+      `SELECT * FROM v_detalhe_ofertas WHERE culto_id = $1 ORDER BY tipo, data_registo`,
+      [culto_id],
+    );
+    const culto = cultoRes.rows[0];
+    const titulo = `Ficha de Ofertas — ${culto.tipo} (${culto.data_formatada})`;
+    const html   = gerarFichaOfertasHTML({ titulo, username, culto, ofertas: ofertasRes.rows });
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
+  } catch (err) {
+    console.error("ofertas/pdf error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── Ofertas: exportar CSV (Excel) ─────────────────────────────────────────────
+router.get("/ofertas/csv/:culto_id", authenticate, async (req, res) => {
+  const { culto_id } = req.params;
+  try {
+    const cultoRes = await query(
+      `SELECT c.tipo, TO_CHAR(c.data, 'DD/MM/YYYY') AS data_formatada, b.nome AS filial
+       FROM cultos c LEFT JOIN branches b ON b.id = c.branch_id WHERE c.id = $1`,
+      [culto_id],
+    );
+    if (!cultoRes.rows.length)
+      return res.status(404).json({ message: "Culto não encontrado." });
+
+    const ofertasRes = await query(
+      `SELECT
+         tipo                                        AS "Tipo",
+         canal                                       AS "Canal",
+         codigo_membro                               AS "Código Membro",
+         membro_nome                                 AS "Nome do Membro",
+         valor                                       AS "Valor (MT)",
+         TO_CHAR(data_registo, 'DD/MM/YYYY HH24:MI') AS "Data Registo"
+       FROM v_detalhe_ofertas
+       WHERE culto_id = $1
+       ORDER BY tipo, data_registo`,
+      [culto_id],
+    );
+
+    const culto   = cultoRes.rows[0];
+    const headers = ["Tipo", "Canal", "Código Membro", "Nome do Membro", "Valor (MT)", "Data Registo"];
+    const csvLines = [
+      `# Ficha de Ofertas — ${culto.tipo} (${culto.data_formatada}) — ${culto.filial}`,
+      headers.join(","),
+      ...ofertasRes.rows.map((row) =>
+        headers.map((h) => `"${row[h] ?? ""}"`).join(","),
+      ),
+    ];
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="ofertas_culto_${culto_id}.csv"`,
+    );
+    res.send("﻿" + csvLines.join("\n"));
+  } catch (err) {
+    console.error("ofertas/csv error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
