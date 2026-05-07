@@ -17,16 +17,16 @@ function branchScope(user) {
 
 // ── Criar culto ──────────────────────────────────────────────────────────────
 export const criarCulto = async (req, res) => {
-  const { data, tipo, categoria, pregador, horario, inter_filial } = req.body;
+  const { data, tipo, categoria, pregador, horario, inter_filial, tipo_registo } = req.body;
   const { role_id, branch_id } = req.user;
   const isAdmin = role_id === 1 || role_id === 2;
   const filial  = isAdmin ? (req.body.branch_id || branch_id) : branch_id;
 
   try {
     const result = await query(`
-      INSERT INTO cultos (branch_id, data, tipo, categoria, pregador, horario, inter_filial)
-      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
-    `, [filial, data, tipo, categoria || "Culto", pregador, horario, inter_filial || false]);
+      INSERT INTO cultos (branch_id, data, tipo, categoria, pregador, horario, inter_filial, tipo_registo)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *
+    `, [filial, data, tipo, categoria || "Culto", pregador, horario, inter_filial || false, tipo_registo || "presencas"]);
 
     const culto = result.rows[0];
     await logActivity(req, {
@@ -47,24 +47,28 @@ export const criarCulto = async (req, res) => {
 export const listarCultos = async (req, res) => {
   const { role_id, branch_id } = req.user;
   const isAdmin = role_id === 1 || role_id === 2;
+  const { tipo_registo } = req.query;
 
   try {
-    const result = isAdmin
-      ? await query(`
-          SELECT c.*, b.nome as nome_branch,
-            (SELECT COUNT(*) FROM frequencias f WHERE f.culto_id = c.id AND f.presente = true) as total_presentes
-          FROM cultos c
-          LEFT JOIN branches b ON c.branch_id = b.id
-          ORDER BY c.data DESC
-        `)
-      : await query(`
-          SELECT c.*, b.nome as nome_branch,
-            (SELECT COUNT(*) FROM frequencias f WHERE f.culto_id = c.id AND f.presente = true) as total_presentes
-          FROM cultos c
-          LEFT JOIN branches b ON c.branch_id = b.id
-          WHERE c.branch_id = $1
-          ORDER BY c.data DESC
-        `, [branch_id]);
+    let conditions = isAdmin ? [] : [`c.branch_id = $1`];
+    let params     = isAdmin ? [] : [branch_id];
+    let idx        = params.length + 1;
+
+    if (tipo_registo) {
+      conditions.push(`c.tipo_registo = $${idx++}`);
+      params.push(tipo_registo);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const result = await query(`
+      SELECT c.*, b.nome as nome_branch,
+        (SELECT COUNT(*) FROM frequencias f WHERE f.culto_id = c.id AND f.presente = true) as total_presentes
+      FROM cultos c
+      LEFT JOIN branches b ON c.branch_id = b.id
+      ${where}
+      ORDER BY c.data DESC
+    `, params);
 
     res.json({ success: true, cultos: result.rows });
   } catch (err) {
@@ -93,19 +97,19 @@ export const obterCulto = async (req, res) => {
 };
 
 
-//Editar culto 
+//Editar culto
 export const actualizarCulto = async (req, res) => {
   const { id } = req.params;
-  const { data, tipo, categoria, pregador, horario, branch_id, inter_filial } = req.body;
+  const { data, tipo, categoria, pregador, horario, branch_id, inter_filial, tipo_registo } = req.body;
 
   try {
     const result = await query(`
       UPDATE cultos
       SET data = $1, tipo = $2, categoria = $3, pregador = $4,
-          horario = $5, branch_id = $6, inter_filial = $7
-      WHERE id = $8
+          horario = $5, branch_id = $6, inter_filial = $7, tipo_registo = $8
+      WHERE id = $9
       RETURNING *
-    `, [data, tipo, categoria, pregador, horario, branch_id, inter_filial, id]);
+    `, [data, tipo, categoria, pregador, horario, branch_id, inter_filial, tipo_registo || "presencas", id]);
 
     if (!result.rows.length)
       return res.status(404).json({ success: false, error: "Culto não encontrado" });
@@ -192,17 +196,22 @@ export const obterPresencas = async (req, res) => {
   const isAdmin = role_id === 1 || role_id === 2;
 
   try {
-    // Verifica se o culto é inter-filial
     const cultoInfo = await query(
-      `SELECT branch_id, inter_filial FROM cultos WHERE id = $1`, [culto_id]
+      `SELECT branch_id, inter_filial, tipo_registo FROM cultos WHERE id = $1`, [culto_id]
     );
 
     if (!cultoInfo.rows.length)
       return res.status(404).json({ success: false, error: "Culto não encontrado" });
 
-    const { inter_filial, branch_id: cultoBranch } = cultoInfo.rows[0];
+    const { inter_filial, branch_id: cultoBranch, tipo_registo } = cultoInfo.rows[0];
 
-    // Verifica permissão
+    if (tipo_registo === "visitantes")
+      return res.status(400).json({
+        success: false,
+        error: "Este culto é para visitantes — usa o módulo de Visitantes.",
+        tipo_registo: "visitantes",
+      });
+
     if (!isAdmin && cultoBranch !== branch_id)
       return res.status(403).json({ success: false, error: "Sem permissão para este culto" });
 
@@ -232,6 +241,7 @@ export const obterPresencas = async (req, res) => {
     res.json({
       success: true,
       inter_filial,
+      tipo_registo,
       stats: { total, presentes, ausentes, percentagem },
       membros: result.rows,
     });
