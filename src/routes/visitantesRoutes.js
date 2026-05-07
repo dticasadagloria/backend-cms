@@ -4,6 +4,7 @@ import {
   listarVisitantes,
   visitantesPorCulto,
   apagarVisitante,
+  actualizarVisitante,
   converterEmMembro,
   relatorioMensal,
 } from "../controllers/visitantesController.js";
@@ -15,6 +16,7 @@ router.post("/",                    authenticate, registarVisitante);
 router.get("/",                     authenticate, listarVisitantes);
 router.get("/relatorio",            authenticate, relatorioMensal);
 router.get("/culto/:culto_id",      authenticate, visitantesPorCulto);
+router.put("/:id",                  authenticate, actualizarVisitante);
 router.delete("/:id",               authenticate, apagarVisitante);
 router.post("/:id/converter",       authenticate, converterEmMembro);
 

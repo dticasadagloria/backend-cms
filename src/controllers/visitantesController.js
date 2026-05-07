@@ -83,6 +83,40 @@ export const visitantesPorCulto = async (req, res) => {
   }
 };
 
+// ── Actualizar visitante ─────────────────────────────────────────────────────
+export const actualizarVisitante = async (req, res) => {
+  const { id } = req.params;
+  const { nome, genero, faixa_etaria, contacto, bairro, culto_id, externo, igreja_origem, observacoes } = req.body;
+
+  try {
+    const existing = await query("SELECT id, nome FROM visitantes WHERE id = $1", [id]);
+    if (!existing.rows.length)
+      return res.status(404).json({ success: false, error: "Visitante não encontrado" });
+
+    const result = await query(`
+      UPDATE visitantes
+      SET nome = $1, genero = $2, faixa_etaria = $3, contacto = $4,
+          bairro = $5, culto_id = $6, externo = $7, igreja_origem = $8, observacoes = $9
+      WHERE id = $10
+      RETURNING *
+    `, [nome, genero, faixa_etaria, contacto, bairro, culto_id,
+        externo ?? true, igreja_origem, observacoes, id]);
+
+    const visitante = result.rows[0];
+    await logActivity(req, {
+      action:       "UPDATE",
+      entity_type:  "visitante",
+      entity_id:    parseInt(id),
+      entity_label: visitante.nome,
+      new_values:   visitante,
+      description:  `Actualizou o visitante ${visitante.nome}`,
+    });
+    res.json({ success: true, visitante });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 // ── Apagar visitante ─────────────────────────────────────────────────────────
 export const apagarVisitante = async (req, res) => {
   const { id } = req.params;
