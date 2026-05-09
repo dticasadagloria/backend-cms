@@ -81,7 +81,7 @@ export const listarRequisicoes = async (req, res) => {
         r.*,
         b.nome                                              AS nome_filial,
         d.nome                                              AS nome_departamento,
-        COALESCE(m.nome_membro, r.nome_solicitante)        AS nome_solicitante,
+        COALESCE(m.nome, r.nome_solicitante)        AS nome_solicitante,
         r.contacto_solicitante,
         u.username                                          AS criado_por_nome
       FROM requisicoes r
@@ -109,7 +109,7 @@ export const obterRequisicao = async (req, res) => {
         r.*,
         b.nome                                          AS nome_filial,
         d.nome                                          AS nome_departamento,
-        COALESCE(m.nome_membro, r.nome_solicitante)    AS nome_solicitante,
+        COALESCE(m.nome, r.nome_solicitante)    AS nome_solicitante,
         r.contacto_solicitante
       FROM requisicoes r
       LEFT JOIN branches      b ON r.filial_id            = b.id
