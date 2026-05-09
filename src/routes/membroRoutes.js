@@ -24,21 +24,21 @@ router.get("/lookup", authenticate, lookupMembro);
 router.get("/:id", authenticate, getMembroByIdHandler);
 
 // Apenas Admin e Pastor podem criar/editar/deletar
-router.post("/", authenticate, requireRole(1, 2), createMembroHandler);
-router.put("/:id", authenticate, requireRole(1, 2), updateMembroHandler);
+router.post("/", authenticate, requireRole(1, 2, 8, 11), createMembroHandler);
+router.put("/:id", authenticate, requireRole(1, 2, 8, 11), updateMembroHandler);
 router.delete(
   "/:id/hard",
   authenticate,
-  requireRole(1),
+  requireRole(1, 2, 8, 11),
   deleteMembroHardHandler,
 );
 
 //Desativar/Ativar o estado do membro para ativo ou inativo
-router.delete("/:id", authenticate, requireRole(1), deleteMembroHandler);
+router.delete("/:id", authenticate, requireRole(1, 2, 8, 11), deleteMembroHandler);
 router.patch(
   "/:id/reactivate",
   authenticate,
-  requireRole(1),
+  requireRole(1, 2, 8, 11),
   reactivateMembroHandler,
 );
 
