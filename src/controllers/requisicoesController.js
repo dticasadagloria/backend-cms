@@ -17,7 +17,7 @@ const enviarEmailRequisicao = async ({ requisicao, nomeFilial, nomeDepartamento 
     await resend.emails.send({
       from:    "IICGP <onboarding@resend.dev>",
       to:      contacto_solicitante,
-      subject: `✅ Requisição ${codigo} submetida com sucesso`,
+      subject: `Requisição ${codigo} submetida com sucesso`,
       html: `
         <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:32px;background:#fff;border-radius:12px;border:1px solid #e2e8f0">
           <h2 style="color:#f59e0b;margin-bottom:4px">Requisição Recebida</h2>
@@ -181,7 +181,7 @@ export const listarRequisicoes = async (req, res) => {
         r.*,
         b.nome                                              AS nome_filial,
         d.nome                                              AS nome_departamento,
-        COALESCE(m.nome_membro, r.nome_solicitante)        AS nome_solicitante,
+        COALESCE(m.nome, r.nome_solicitante)        AS nome_solicitante,
         r.contacto_solicitante,
         u.username                                          AS criado_por_nome
       FROM requisicoes r
@@ -209,7 +209,7 @@ export const obterRequisicao = async (req, res) => {
         r.*,
         b.nome                                          AS nome_filial,
         d.nome                                          AS nome_departamento,
-        COALESCE(m.nome_membro, r.nome_solicitante)    AS nome_solicitante,
+        COALESCE(m.nome, r.nome_solicitante)    AS nome_solicitante,
         r.contacto_solicitante
       FROM requisicoes r
       LEFT JOIN branches      b ON r.filial_id            = b.id
