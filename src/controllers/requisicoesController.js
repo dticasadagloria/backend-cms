@@ -79,7 +79,9 @@ export const listarRequisicoes = async (req, res) => {
 
     const result = await query(`
       SELECT r.*, b.nome as nome_filial, d.nome as nome_departamento,
-        m.nome as nome_solicitante, u.username as criado_por_nome
+        COALESCE(m.nome, r.nome_solicitante) as nome_solicitante,
+        r.contacto_solicitante,
+        u.username as criado_por_nome
       FROM requisicoes r
       LEFT JOIN branches b ON r.filial_id = b.id
       LEFT JOIN departamentos d ON r.departamento_id = d.id
@@ -104,7 +106,8 @@ export const obterRequisicao = async (req, res) => {
         r.*,
         b.nome    as nome_filial,
         d.nome    as nome_departamento,
-        m.nome    as nome_solicitante
+        COALESCE(m.nome, r.nome_solicitante) as nome_solicitante,
+        r.contacto_solicitante
       FROM requisicoes r
       LEFT JOIN branches      b ON r.filial_id             = b.id
       LEFT JOIN departamentos d ON r.departamento_id       = d.id
@@ -332,10 +335,12 @@ export const criarRequisicaoPublica = async (req, res) => {
   try {
     const result = await query(`
       INSERT INTO requisicoes
-        (filial_id, departamento_id, descricao, valor, observacoes, status)
-      VALUES ($1, $2, $3, $4, $5, 'Em Espera')
+        (filial_id, departamento_id, descricao, valor, observacoes, status,
+         nome_solicitante, contacto_solicitante)
+      VALUES ($1, $2, $3, $4, $5, 'Em Espera', $6, $7)
       RETURNING *
-    `, [filial_id, departamento_id || null, descricao, valor, observacoes]);
+    `, [filial_id, departamento_id || null, descricao, valor, observacoes,
+        nome_solicitante || null, contacto || null]);
 
     const requisicao = result.rows[0];
 
