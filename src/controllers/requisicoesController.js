@@ -8,7 +8,6 @@ export const criarRequisicao = async (req, res) => {
   const { role_id, branch_id, id: criado_por } = req.user;
   const isAdmin = role_id === 1 || role_id === 2;
 
-  // Admin pode escolher filial, outros usam a sua
   const filial = isAdmin ? (req.body.filial_id || branch_id) : branch_id;
 
   try {
@@ -43,6 +42,7 @@ export const criarRequisicao = async (req, res) => {
       new_values:   { descricao: requisicao.descricao, valor: requisicao.valor },
       description:  `Criou a requisição #${requisicao.id}: ${requisicao.descricao}`,
     });
+
     res.status(201).json({ success: true, requisicao });
   } catch (err) {
     console.error("criarRequisicao error:", err.message);
@@ -61,7 +61,6 @@ export const listarRequisicoes = async (req, res) => {
     let params     = [];
     let idx        = 1;
 
-    // Se não é admin, força a filial do user
     if (!isAdmin) {
       conditions.push(`r.filial_id = $${idx++}`);
       params.push(userBranch);
@@ -78,21 +77,25 @@ export const listarRequisicoes = async (req, res) => {
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const result = await query(`
-      SELECT r.*, b.nome as nome_filial, d.nome as nome_departamento,
-        COALESCE(m.nome, r.nome_solicitante) as nome_solicitante,
+      SELECT
+        r.*,
+        b.nome                                              AS nome_filial,
+        d.nome                                              AS nome_departamento,
+        COALESCE(m.nome_membro, r.nome_solicitante)        AS nome_solicitante,
         r.contacto_solicitante,
-        u.username as criado_por_nome
+        u.username                                          AS criado_por_nome
       FROM requisicoes r
-      LEFT JOIN branches b ON r.filial_id = b.id
-      LEFT JOIN departamentos d ON r.departamento_id = d.id
-      LEFT JOIN membros m ON r.lider_solicitante_id = m.id
-      LEFT JOIN usuarios u ON r.criado_por = u.id
+      LEFT JOIN branches     b ON r.filial_id            = b.id
+      LEFT JOIN departamentos d ON r.departamento_id     = d.id
+      LEFT JOIN membros       m ON r.lider_solicitante_id = m.id
+      LEFT JOIN usuarios      u ON r.criado_por           = u.id
       ${where}
       ORDER BY r.criado_em DESC
     `, params);
 
     res.json({ success: true, requisicoes: result.rows });
   } catch (err) {
+    console.error("listarRequisicoes error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
@@ -104,14 +107,14 @@ export const obterRequisicao = async (req, res) => {
     const req_result = await query(`
       SELECT
         r.*,
-        b.nome    as nome_filial,
-        d.nome    as nome_departamento,
-        COALESCE(m.nome, r.nome_solicitante) as nome_solicitante,
+        b.nome                                          AS nome_filial,
+        d.nome                                          AS nome_departamento,
+        COALESCE(m.nome_membro, r.nome_solicitante)    AS nome_solicitante,
         r.contacto_solicitante
       FROM requisicoes r
-      LEFT JOIN branches      b ON r.filial_id             = b.id
-      LEFT JOIN departamentos d ON r.departamento_id       = d.id
-      LEFT JOIN membros       m ON r.lider_solicitante_id  = m.id
+      LEFT JOIN branches      b ON r.filial_id            = b.id
+      LEFT JOIN departamentos d ON r.departamento_id      = d.id
+      LEFT JOIN membros       m ON r.lider_solicitante_id = m.id
       WHERE r.id = $1
     `, [id]);
 
@@ -123,43 +126,42 @@ export const obterRequisicao = async (req, res) => {
     );
 
     const historico = await query(`
-      SELECT h.*, u.username as alterado_por_nome
+      SELECT h.*, u.username AS alterado_por_nome
       FROM requisicao_historico h
-      LEFT JOIN users u ON h.alterado_por = u.id
+      LEFT JOIN usuarios u ON h.alterado_por = u.id
       WHERE h.requisicao_id = $1
       ORDER BY h.alterado_em ASC
     `, [id]);
 
     res.json({
-      success: true,
+      success:    true,
       requisicao: req_result.rows[0],
       itens:      itens.rows,
       historico:  historico.rows,
     });
   } catch (err) {
+    console.error("obterRequisicao error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
 
 // ── Actualizar status ────────────────────────────────────────────────────────
 export const actualizarStatus = async (req, res) => {
-  const { id }                  = req.params;
-  const { status, observacao }  = req.body;
-  const alterado_por            = req.user?.id;
+  const { id }                 = req.params;
+  const { status, observacao } = req.body;
+  const alterado_por           = req.user?.id;
 
   const statusValidos = ["Em Espera", "Aprovado", "Pago", "Rejeitado"];
   if (!statusValidos.includes(status))
     return res.status(400).json({ success: false, error: "Status inválido" });
 
   try {
-    // Busca status actual
     const actual = await query(`SELECT status FROM requisicoes WHERE id = $1`, [id]);
     if (!actual.rows.length)
       return res.status(404).json({ success: false, error: "Requisição não encontrada" });
 
     const status_anterior = actual.rows[0].status;
 
-    // Campos de data a actualizar consoante o status
     let extraFields = "";
     if (status === "Aprovado") extraFields = ", data_aprovacao = CURRENT_DATE";
     if (status === "Pago")     extraFields = ", data_pagamento = CURRENT_DATE";
@@ -170,7 +172,6 @@ export const actualizarStatus = async (req, res) => {
       WHERE id = $2
     `, [status, id]);
 
-    // Regista no historial
     await query(`
       INSERT INTO requisicao_historico
         (requisicao_id, status_anterior, status_novo, alterado_por, observacao)
@@ -186,8 +187,10 @@ export const actualizarStatus = async (req, res) => {
       new_values:   { status },
       description:  `Alterou o status da requisição #${id}: ${status_anterior} → ${status}`,
     });
+
     res.json({ success: true, message: `Requisição ${status} com sucesso` });
   } catch (err) {
+    console.error("actualizarStatus error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
@@ -199,7 +202,7 @@ export const uploadComprovativo = async (req, res) => {
     return res.status(400).json({ success: false, error: "Nenhum ficheiro enviado" });
 
   try {
-    const url = req.file.path; // Cloudinary URL
+    const url = req.file.path;
 
     await query(`
       UPDATE requisicoes SET comprovativo_url = $1, atualizado_em = CURRENT_TIMESTAMP
@@ -208,6 +211,7 @@ export const uploadComprovativo = async (req, res) => {
 
     res.json({ success: true, url, message: "Comprovativo enviado com sucesso" });
   } catch (err) {
+    console.error("uploadComprovativo error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
@@ -216,7 +220,6 @@ export const uploadComprovativo = async (req, res) => {
 export const apagarRequisicao = async (req, res) => {
   const { id } = req.params;
   try {
-    // Apaga comprovativo do Cloudinary se existir
     const result = await query(`SELECT comprovativo_url FROM requisicoes WHERE id = $1`, [id]);
     const url    = result.rows[0]?.comprovativo_url;
 
@@ -226,6 +229,7 @@ export const apagarRequisicao = async (req, res) => {
     }
 
     await query(`DELETE FROM requisicoes WHERE id = $1`, [id]);
+
     await logActivity(req, {
       action:       "DELETE",
       entity_type:  "requisicao",
@@ -233,8 +237,10 @@ export const apagarRequisicao = async (req, res) => {
       entity_label: `Requisição #${id}`,
       description:  `Apagou a requisição #${id}`,
     });
+
     res.json({ success: true, message: "Requisição apagada com sucesso" });
   } catch (err) {
+    console.error("apagarRequisicao error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
@@ -242,62 +248,57 @@ export const apagarRequisicao = async (req, res) => {
 // ── Relatórios ───────────────────────────────────────────────────────────────
 export const relatorios = async (req, res) => {
   try {
-    // Stats gerais
     const stats = await query(`
       SELECT
-        COUNT(*)                                              as total,
-        COUNT(CASE WHEN status = 'Em Espera'  THEN 1 END)   as em_espera,
-        COUNT(CASE WHEN status = 'Aprovado'   THEN 1 END)   as aprovadas,
-        COUNT(CASE WHEN status = 'Pago'       THEN 1 END)   as pagas,
-        COUNT(CASE WHEN status = 'Rejeitado'  THEN 1 END)   as rejeitadas,
-        COALESCE(SUM(CASE WHEN status = 'Pago' THEN valor END), 0) as total_pago
+        COUNT(*)                                                        AS total,
+        COUNT(CASE WHEN status = 'Em Espera'  THEN 1 END)             AS em_espera,
+        COUNT(CASE WHEN status = 'Aprovado'   THEN 1 END)             AS aprovadas,
+        COUNT(CASE WHEN status = 'Pago'       THEN 1 END)             AS pagas,
+        COUNT(CASE WHEN status = 'Rejeitado'  THEN 1 END)             AS rejeitadas,
+        COALESCE(SUM(CASE WHEN status = 'Pago' THEN valor END), 0)    AS total_pago
       FROM requisicoes
     `);
 
-    // Gastos por mês
     const porMes = await query(`
       SELECT
-        TO_CHAR(data_pagamento, 'Mon YYYY') as mes,
-        TO_CHAR(data_pagamento, 'YYYY-MM')  as mes_ordem,
-        COUNT(*)                            as total_requisicoes,
-        SUM(valor)                          as total_pago
+        TO_CHAR(data_pagamento, 'Mon YYYY') AS mes,
+        TO_CHAR(data_pagamento, 'YYYY-MM')  AS mes_ordem,
+        COUNT(*)                            AS total_requisicoes,
+        SUM(valor)                          AS total_pago
       FROM requisicoes
       WHERE status = 'Pago' AND data_pagamento IS NOT NULL
       GROUP BY TO_CHAR(data_pagamento, 'Mon YYYY'), TO_CHAR(data_pagamento, 'YYYY-MM')
       ORDER BY mes_ordem ASC
     `);
 
-    // Por filial
     const porFilial = await query(`
       SELECT
-        b.nome                              as nome_filial,
-        COUNT(r.id)                         as total_requisicoes,
-        COUNT(CASE WHEN r.status = 'Pago' THEN 1 END) as pagas,
-        COALESCE(SUM(CASE WHEN r.status = 'Pago' THEN r.valor END), 0) as total_pago
+        b.nome                                                          AS nome_filial,
+        COUNT(r.id)                                                     AS total_requisicoes,
+        COUNT(CASE WHEN r.status = 'Pago' THEN 1 END)                  AS pagas,
+        COALESCE(SUM(CASE WHEN r.status = 'Pago' THEN r.valor END), 0) AS total_pago
       FROM branches b
       LEFT JOIN requisicoes r ON r.filial_id = b.id
       GROUP BY b.id, b.nome
       ORDER BY total_pago DESC
     `);
 
-    // Por departamento
     const porDepartamento = await query(`
       SELECT
-        COALESCE(d.nome, 'Sem Departamento') as nome_departamento,
-        COUNT(r.id)                          as total_requisicoes,
-        COALESCE(SUM(CASE WHEN r.status = 'Pago' THEN r.valor END), 0) as total_pago
+        COALESCE(d.nome, 'Sem Departamento')                           AS nome_departamento,
+        COUNT(r.id)                                                     AS total_requisicoes,
+        COALESCE(SUM(CASE WHEN r.status = 'Pago' THEN r.valor END), 0) AS total_pago
       FROM requisicoes r
       LEFT JOIN departamentos d ON r.departamento_id = d.id
       GROUP BY d.id, d.nome
       ORDER BY total_pago DESC
     `);
 
-    // Top filiais com mais gastos
     const topFiliais = await query(`
       SELECT
-        b.nome                as nome_filial,
-        SUM(r.valor)          as total_gasto,
-        COUNT(r.id)           as num_requisicoes
+        b.nome        AS nome_filial,
+        SUM(r.valor)  AS total_gasto,
+        COUNT(r.id)   AS num_requisicoes
       FROM requisicoes r
       JOIN branches b ON r.filial_id = b.id
       WHERE r.status = 'Pago'
@@ -307,19 +308,20 @@ export const relatorios = async (req, res) => {
     `);
 
     res.json({
-      success: true,
-      stats:          stats.rows[0],
-      porMes:         porMes.rows,
-      porFilial:      porFilial.rows,
+      success:         true,
+      stats:           stats.rows[0],
+      porMes:          porMes.rows,
+      porFilial:       porFilial.rows,
       porDepartamento: porDepartamento.rows,
-      topFiliais:     topFiliais.rows,
+      topFiliais:      topFiliais.rows,
     });
   } catch (err) {
+    console.error("relatorios error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
 
-// Requisicao publica
+// ── Criar requisição pública ─────────────────────────────────────────────────
 export const criarRequisicaoPublica = async (req, res) => {
   const {
     nome_solicitante, contacto, filial_id,
@@ -344,7 +346,6 @@ export const criarRequisicaoPublica = async (req, res) => {
 
     const requisicao = result.rows[0];
 
-    // Insere itens se existirem
     for (const item of itens) {
       if (item.descricao) {
         await query(`
@@ -354,7 +355,6 @@ export const criarRequisicaoPublica = async (req, res) => {
       }
     }
 
-    // Historial
     await query(`
       INSERT INTO requisicao_historico
         (requisicao_id, status_anterior, status_novo, observacao)
@@ -363,7 +363,7 @@ export const criarRequisicaoPublica = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      codigo: requisicao.codigo,
+      codigo:  requisicao.codigo,
       message: "Requisição submetida com sucesso"
     });
   } catch (err) {
