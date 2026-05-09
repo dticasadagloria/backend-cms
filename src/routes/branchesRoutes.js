@@ -4,12 +4,23 @@ import { authenticate } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+router.get("/", authenticate, async (req, res) => {
   try {
-    const result = await query(`SELECT * FROM branches ORDER BY nome ASC`);
-    res.json({ success: true, branches: result.rows });
+    const result = await query(`
+      SELECT * FROM branches
+      ORDER BY nome ASC
+    `);
+
+    res.json({
+      success: true,
+      branches: result.rows
+    });
+
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
   }
 });
 
