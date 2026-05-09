@@ -3,7 +3,7 @@ import { gerarLogsHTML } from "../templates/logsTemplate.js";
 
 export const listarLogs = async (req, res) => {
   const { role_id, branch_id } = req.user;
-  const isAdmin = role_id === 1 || role_id === 2;
+  const isAdmin = role_id === 1 || role_id === 2 || role_id === 8 || role_id === 12; // Admin, SuperAdmin ou Sede
 
   const {
     page        = 1,
@@ -100,7 +100,7 @@ export const listarLogs = async (req, res) => {
 // ── Exportar logs como HTML (imprimível / save-as-PDF) ───────────────────────
 export const exportarLogsPDF = async (req, res) => {
   const { role_id, branch_id, username } = req.user;
-  const isAdmin = role_id === 1 || role_id === 2;
+  const isAdmin = role_id === 1 || role_id === 2 ; // Admin, SuperAdmin ou Sede
 
   const { action, entity_type, from, to, search, branch_id: filterBranch } = req.query;
 
