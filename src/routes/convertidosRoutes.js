@@ -12,6 +12,6 @@ const router = express.Router();
 router.get("/",        authenticate, listarConvertidos);
 router.get("/stats",   authenticate, statsConvertidos);
 router.post("/",       authenticate, registarConvertido);
-router.delete("/:id",  authenticate, requireRole(1, 2), apagarConvertido);
+router.delete("/:id",  authenticate, requireRole(1, 2, 8, 11), apagarConvertido);
 
 export default router;
