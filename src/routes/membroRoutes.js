@@ -8,6 +8,8 @@ import {
   deleteMembroHardHandler,
   reactivateMembroHandler,
   membrosSemCelula,
+  exportarMembrosPDF,
+  exportarMembrosExcel,
 } from "../controllers/membroController.js";
 import { authenticate } from "../middleware/authMiddleware.js";
 import { requireRole } from "../middleware/authMiddleware.js";
@@ -20,7 +22,12 @@ const router = express.Router();
 // Todos os users autenticados podem ver
 router.get("/", authenticate, getAllMembrosHandler);
 router.get("/lista/sem-celula", authenticate, membrosSemCelula);
-router.get("/lookup", authenticate, lookupMembro); 
+router.get("/lookup", authenticate, lookupMembro);
+
+// ── Exportações (devem vir antes de /:id) ────────────────────────────────────
+router.get("/exportar/pdf",   authenticate, exportarMembrosPDF);
+router.get("/exportar/excel", authenticate, exportarMembrosExcel);
+
 router.get("/:id", authenticate, getMembroByIdHandler);
 
 // Apenas Admin e Pastor podem criar/editar/deletar
