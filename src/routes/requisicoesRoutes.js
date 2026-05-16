@@ -1,5 +1,6 @@
 import express from "express";
 import multer from "multer";
+import path from "path";
 import {
   criarRequisicao,
   listarRequisicoes,
@@ -19,9 +20,16 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits:  { fileSize: 10 * 1024 * 1024 }, // 10 MB
   fileFilter: (_req, file, cb) => {
-    const allowed = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
-    cb(null, allowed.includes(file.mimetype));
-  },
+  const allowedMimes = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
+  const allowedExts  = [".jpg", ".jpeg", ".png", ".pdf"];
+  const ext = path.extname(file.originalname).toLowerCase();
+
+  if (allowedMimes.includes(file.mimetype) || allowedExts.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error(`Tipo de ficheiro não permitido: ${file.mimetype}`));
+  }
+},
 });
 
 const ADMIN  = 1;
