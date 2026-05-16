@@ -41,9 +41,9 @@ setInterval(keepAlive, 10 * 60 * 1000); // a cada 10 minutos
 app.use(
   cors({
     origin: [
-      "https://iicgp-frontend.onrender.com", // ✅ domínio do frontend
+      "https://iicgp-frontend.onrender.com", // domínio do frontend
       "https://casadagloria-cms.vercel.app", 
-      "http://localhost:5173",               // ✅ para testes locais
+      "http://localhost:5173",               // para testes locais
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -155,6 +155,22 @@ app.get("/api/celulas", authenticate, async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+app.get("/debug/routes", (req, res) => {
+  const routes = [];
+  app._router.stack.forEach((middleware) => {
+    if (middleware.route) {
+      routes.push(middleware.route.path);
+    } else if (middleware.name === "router") {
+      middleware.handle.stack.forEach((handler) => {
+        if (handler.route) {
+          routes.push(handler.route.path);
+        }
+      });
+    }
+  });
+  res.json(routes);
 });
 
 //Admin post de ativo ou inativo
