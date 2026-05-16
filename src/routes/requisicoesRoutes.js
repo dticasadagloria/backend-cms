@@ -1,7 +1,5 @@
 import express from "express";
 import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
-import cloudinary from "../config/cloudinary.js";
 import {
   criarRequisicao,
   listarRequisicoes,
@@ -16,17 +14,15 @@ import { authenticate, requireRole } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Cloudinary storage para comprovativos
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder:          "iicgp/comprovativos",
-    allowed_formats: ["jpg", "jpeg", "png", "pdf"],
-    resource_type:   "auto",
-    type:            "upload",
+// Guarda o ficheiro em memória — o controller faz o upload directo ao Cloudinary
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits:  { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
+    cb(null, allowed.includes(file.mimetype));
   },
 });
-const upload = multer({ storage });
 
 const ADMIN  = 1;
 const PASTOR = 2;

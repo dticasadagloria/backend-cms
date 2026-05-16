@@ -302,7 +302,15 @@ export const uploadComprovativo = async (req, res) => {
     return res.status(400).json({ success: false, error: "Nenhum ficheiro enviado" });
 
   try {
-    const url = req.file.path;
+    // Upload directo ao Cloudinary usando o buffer em memória
+    const result = await new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_stream(
+        { folder: "iicgp/comprovativos", resource_type: "auto" },
+        (err, data) => (err ? reject(err) : resolve(data))
+      ).end(req.file.buffer);
+    });
+
+    const url = result.secure_url;
 
     await query(`
       UPDATE requisicoes SET comprovativo_url = $1, atualizado_em = CURRENT_TIMESTAMP
