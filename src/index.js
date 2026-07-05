@@ -27,13 +27,20 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 
+// URL público do próprio backend (permite override por env em futuras migrações)
+const SELF_URL = process.env.SELF_URL || "https://iicgp-backend-cms.onrender.com";
+
+// Auto-ping para evitar que o Render (free tier) adormeça após 15 min de inactividade.
+// Aponta para /health (leve, sem tocar na base de dados).
 const keepAlive = () => {
-  https.get("https://iicgp-backend-cms.onrender.com/", (res) => {
+  https.get(`${SELF_URL}/health`, (res) => {
     console.log(`Keep-alive ping: ${res.statusCode}`);
-  }).on("error", () => {});
+  }).on("error", (err) => {
+    console.error("Keep-alive ping falhou:", err.message);
+  });
 };
 
-setInterval(keepAlive, 10 * 60 * 1000); // a cada 10 minutos
+setInterval(keepAlive, 10 * 60 * 1000); // a cada 10 minutos (Render dorme aos 15 min)
 
 // ==================== MIDDLEWARES ====================
 
@@ -71,6 +78,12 @@ app.get("/", (req, res) => {
       testConnection: "GET /test/connection",
     },
   });
+});
+
+// Health check — leve, sem tocar na base de dados. Usado pelo auto-ping
+// e por monitores externos de uptime (UptimeRobot, cron-job.org, etc.).
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", uptime: process.uptime() });
 });
 
 // Rotas de autenticação
