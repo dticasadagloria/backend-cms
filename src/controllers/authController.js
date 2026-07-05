@@ -13,7 +13,7 @@ if (!process.env.JWT_SECRET) {
 
 // ==================== REGISTER ====================
 export const register = async (req, res) => {
-  const { username, password, role_id } = req.body;
+  const { username, password, role_id, branch_id } = req.body;
 
   try {
     if (!username || !password || !role_id) {
@@ -35,7 +35,7 @@ export const register = async (req, res) => {
     }
 
     const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
-    const newUser = await createUser(username, password_hash, role_id);
+    const newUser = await createUser(username, password_hash, role_id, branch_id ?? null);
 
     const token = jwt.sign(
       { id: newUser.id, username: newUser.username, role_id: newUser.role_id },
@@ -57,6 +57,7 @@ export const register = async (req, res) => {
         id: newUser.id,
         username: newUser.username,
         role_id: newUser.role_id,
+        branch_id: newUser.branch_id,
         ativo: newUser.ativo,
         data_criacao: newUser.data_criacao
       },

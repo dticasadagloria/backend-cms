@@ -1,13 +1,13 @@
 import { query } from '../config/db.js';
 
 // Criar usuário
-export const createUser = async (username, password_hash, role_id) => {
+export const createUser = async (username, password_hash, role_id, branch_id = null) => {
   const text = `
-    INSERT INTO users (username, password_hash, role_id) 
-    VALUES ($1, $2, $3) 
-    RETURNING id, username, role_id, ativo, data_criacao
+    INSERT INTO users (username, password_hash, role_id, branch_id)
+    VALUES ($1, $2, $3, $4)
+    RETURNING id, username, role_id, branch_id, ativo, data_criacao
   `;
-  const values = [username, password_hash, role_id];
+  const values = [username, password_hash, role_id, branch_id];
   const res = await query(text, values);
   return res.rows[0];
 };
