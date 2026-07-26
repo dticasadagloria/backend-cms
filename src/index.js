@@ -14,6 +14,7 @@ import ofertasRouter from "./routes/ofertasRoutes.js";
 import convertidosRoutes from "./routes/convertidosRoutes.js";
 import relatoriosRoutes from "./routes/relatoriosRoutes.js";
 import logsRoutes from "./routes/logsRoutes.js";
+import criancaRoutes from './routes/criancaRoutes.js';
 import { query } from "./config/db.js";
 import { iniciarScheduler } from "./jobs/scheduler.js";
 import { authenticate } from "./middleware/authMiddleware.js";
@@ -101,7 +102,7 @@ app.use('/api', ofertasRouter);
 app.use("/api/convertidos", convertidosRoutes);
 app.use("/api/relatorios", relatoriosRoutes);
 app.use("/api/logs", logsRoutes);
-
+app.use("/api/criancas", criancaRoutes);
 // ==================== ROTAS DE TESTE ====================
 
 // Testar conexão do banco
