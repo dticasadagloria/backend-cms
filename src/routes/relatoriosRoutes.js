@@ -29,6 +29,9 @@ router.get("/presencas", authenticate, async (req, res) => {
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
     // Cultos com stats
+    // ✅ ausentes = membros elegíveis para o culto - presentes confirmados
+    // (em vez de contar linhas explícitas presente=false, que ficam
+    // incompletas quando nem todos os membros são marcados manualmente).
     const cultos = await query(
       `
       SELECT
@@ -36,14 +39,20 @@ router.get("/presencas", authenticate, async (req, res) => {
         TO_CHAR(c.data, 'DD/MM/YYYY') as data_formatada,
         b.nome as nome_branch,
         COUNT(CASE WHEN f.presente = true  THEN 1 END) as presentes,
-        COUNT(CASE WHEN f.presente = false THEN 1 END) as ausentes,
-        COUNT(f.id)                                    as total_membros,
-        ROUND(COUNT(CASE WHEN f.presente = true THEN 1 END)::numeric / NULLIF(COUNT(f.id), 0) * 100, 1) as taxa
+        mc.total_membros_culto - COUNT(CASE WHEN f.presente = true THEN 1 END) as ausentes,
+        mc.total_membros_culto                                                 as total_membros,
+        ROUND(COUNT(CASE WHEN f.presente = true THEN 1 END)::numeric / NULLIF(mc.total_membros_culto, 0) * 100, 1) as taxa
       FROM cultos c
       LEFT JOIN branches   b ON c.branch_id = b.id
       LEFT JOIN frequencias f ON f.culto_id = c.id
+      CROSS JOIN LATERAL (
+        SELECT COUNT(*) AS total_membros_culto
+        FROM membros m
+        WHERE m.ativo = true
+          AND (c.inter_filial = true OR m.branch_id = c.branch_id)
+      ) mc
       ${where}
-      GROUP BY c.id, c.tipo, c.data, c.horario, b.nome
+      GROUP BY c.id, c.tipo, c.data, c.horario, b.nome, mc.total_membros_culto
       ORDER BY c.data DESC
     `,
       params,
@@ -122,6 +131,7 @@ router.get("/exportar/csv", authenticate, async (req, res) => {
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
+    // ✅ ausentes = membros elegíveis para o culto - presentes confirmados
     const result = await query(
       `
       SELECT
@@ -129,16 +139,22 @@ router.get("/exportar/csv", authenticate, async (req, res) => {
         TO_CHAR(c.data, 'DD/MM/YYYY')  as "Data",
         b.nome                          as "Filial",
         COUNT(CASE WHEN f.presente = true  THEN 1 END) as "Presentes",
-        COUNT(CASE WHEN f.presente = false THEN 1 END) as "Ausentes",
-        COUNT(f.id)                                    as "Total Membros",
-        ROUND(COUNT(CASE WHEN f.presente = true THEN 1 END)::numeric / NULLIF(COUNT(f.id), 0) * 100, 1) as "Taxa %",
+        mc.total_membros_culto - COUNT(CASE WHEN f.presente = true THEN 1 END) as "Ausentes",
+        mc.total_membros_culto                                                 as "Total Membros",
+        ROUND(COUNT(CASE WHEN f.presente = true THEN 1 END)::numeric / NULLIF(mc.total_membros_culto, 0) * 100, 1) as "Taxa %",
         (SELECT COUNT(*) FROM visitantes v WHERE v.culto_id = c.id)       as "Visitantes",
         (SELECT COUNT(*) FROM novos_convertidos nc WHERE nc.culto_id = c.id) as "Convertidos"
       FROM cultos c
       LEFT JOIN branches    b ON c.branch_id = b.id
       LEFT JOIN frequencias f ON f.culto_id  = c.id
+      CROSS JOIN LATERAL (
+        SELECT COUNT(*) AS total_membros_culto
+        FROM membros m
+        WHERE m.ativo = true
+          AND (c.inter_filial = true OR m.branch_id = c.branch_id)
+      ) mc
       ${where}
-      GROUP BY c.id, c.tipo, c.data, b.nome
+      GROUP BY c.id, c.tipo, c.data, b.nome, mc.total_membros_culto
       ORDER BY c.data DESC
     `,
       params,
@@ -181,19 +197,27 @@ router.get("/exportar/pdf", authenticate, async (req, res) => {
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
+    // ✅ ausentes = membros elegíveis para o culto - presentes confirmados
+    // (mesma abordagem já usada em estatisticasGerais/presencasPorMes/presencasPorCulto)
     const cultos = await query(`
       SELECT c.id, c.tipo,
         TO_CHAR(c.data, 'DD/MM/YYYY') as data_formatada,
         b.nome as nome_branch,
         COUNT(CASE WHEN f.presente = true  THEN 1 END) as presentes,
-        COUNT(CASE WHEN f.presente = false THEN 1 END) as ausentes,
-        COUNT(f.id) as total_membros,
-        ROUND(COUNT(CASE WHEN f.presente = true THEN 1 END)::numeric / NULLIF(COUNT(f.id), 0) * 100, 1) as taxa
+        mc.total_membros_culto - COUNT(CASE WHEN f.presente = true THEN 1 END) as ausentes,
+        mc.total_membros_culto                                                 as total_membros,
+        ROUND(COUNT(CASE WHEN f.presente = true THEN 1 END)::numeric / NULLIF(mc.total_membros_culto, 0) * 100, 1) as taxa
       FROM cultos c
       LEFT JOIN branches    b ON c.branch_id = b.id
       LEFT JOIN frequencias f ON f.culto_id  = c.id
+      CROSS JOIN LATERAL (
+        SELECT COUNT(*) AS total_membros_culto
+        FROM membros m
+        WHERE m.ativo = true
+          AND (c.inter_filial = true OR m.branch_id = c.branch_id)
+      ) mc
       ${where}
-      GROUP BY c.id, c.tipo, c.data, b.nome
+      GROUP BY c.id, c.tipo, c.data, b.nome, mc.total_membros_culto
       ORDER BY c.data DESC
     `, params);
 

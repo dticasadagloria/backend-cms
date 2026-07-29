@@ -490,19 +490,24 @@ export const maisAssiduos = async (req, res) => {
   }
 };
  
-// ── Top 10 membros com mais faltas ───────────────────────────────────────────
+// ── Top 10 membros com mais faltas (CORRIGIDO) ───────────────────────────────
+// Antes: contava linhas explícitas presente=false (incompleto quando o
+// membro nunca chega a ser marcado num culto). Agora: total_faltas =
+// (cultos onde o membro era elegível) - (presentes confirmados).
 export const maisFaltas = async (req, res) => {
-  const { filterMembro, params } = branchScope(req.user);
+  const { filter, filterMembro, params } = branchScope(req.user);
   try {
     const result = await query(`
       SELECT
         m.id,
         m.nome              AS nome_membro,
         b.nome              AS nome_branch,
-        COUNT(f.id)         AS total_faltas
+        COUNT(c.id) - COUNT(CASE WHEN f.presente = true THEN 1 END) AS total_faltas
       FROM membros m
       LEFT JOIN branches   b ON b.id = m.branch_id
-      LEFT JOIN frequencias f ON f.membro_id = m.id AND f.presente = false
+      -- ✅ cultos onde o membro era elegível (mesma filial, ou culto inter-filial)
+      LEFT JOIN cultos c ON (c.inter_filial = true OR c.branch_id = m.branch_id) ${filter}
+      LEFT JOIN frequencias f ON f.membro_id = m.id AND f.culto_id = c.id AND f.presente = true
       WHERE m.ativo = true ${filterMembro}
       GROUP BY m.id, m.nome, b.nome
       ORDER BY total_faltas DESC
