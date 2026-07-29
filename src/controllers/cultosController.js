@@ -322,13 +322,19 @@ const separador = primeiraLinha.includes("\t") ? "\t"
 
 
 
-// ── Estatísticas gerais ──────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// CORREÇÕES — coerência de presenças/ausências com múltiplos utilizadores
+// Aplica estas 3 funções no lugar das versões actuais no teu cultoController.js
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── Estatísticas gerais (CORRIGIDO) ───────────────────────────────────────────
+// Antes: ausentes vinha de linhas explícitas presente=false (incompleto).
+// Agora: ausentes = totalMembros - presentes (sempre coerente).
 export const estatisticasGerais = async (req, res) => {
   const { role_id, branch_id } = req.user;
   const isAdmin = role_id === 1 || role_id === 2;
 
   try {
-    // Filtra por branch se não for admin
     const branchFilter = isAdmin ? '' : 'WHERE branch_id = $1';
     const branchParams = isAdmin ? [] : [branch_id];
 
@@ -337,18 +343,19 @@ export const estatisticasGerais = async (req, res) => {
       branchParams
     );
 
+    // ✅ Conta só PRESENTES confirmados (linhas com presente = true)
     const totalPresencas = await query(
       `SELECT COUNT(*) as total FROM frequencias f
        JOIN cultos c ON c.id = f.culto_id
-       ${isAdmin ? '' : 'WHERE c.branch_id = $1'}
-       AND f.presente = true`,
+       WHERE f.presente = true
+       ${isAdmin ? '' : 'AND c.branch_id = $1'}`,
       branchParams
     );
 
     const totalMembros = await query(
       `SELECT COUNT(*) as total FROM membros
-       ${isAdmin ? '' : 'WHERE branch_id = $1'}
-       AND ativo = true`,
+       WHERE ativo = true
+       ${isAdmin ? '' : 'AND branch_id = $1'}`,
       branchParams
     );
 
@@ -375,7 +382,9 @@ export const estatisticasGerais = async (req, res) => {
   }
 };
 
-// ── Presenças por mês ────────────────────────────────────────────────────────
+// ── Presenças por mês (CORRIGIDO) ─────────────────────────────────────────────
+// Ausentes deixa de contar linhas explícitas false — passa a ser
+// (total de membros elegíveis no culto) - (presentes confirmados).
 export const presencasPorMes = async (req, res) => {
   const { filter, params } = branchScope(req.user);
   try {
@@ -384,28 +393,37 @@ export const presencasPorMes = async (req, res) => {
         TO_CHAR(c.data, 'Mon YYYY')  AS mes,
         TO_CHAR(c.data, 'YYYY-MM')   AS mes_ordem,
         COUNT(DISTINCT c.id)                                          AS total_cultos,
-        SUM(CASE WHEN f.presente = true  THEN 1 ELSE 0 END)          AS presentes,
-        SUM(CASE WHEN f.presente = false THEN 1 ELSE 0 END)          AS ausentes,
-        COUNT(f.id)                                                   AS total_registos,
+        SUM(CASE WHEN f.presente = true THEN 1 ELSE 0 END)           AS presentes,
+        -- ✅ ausentes = total de membros esperados por culto - presentes
+        SUM(mc.total_membros_culto)
+          - SUM(CASE WHEN f.presente = true THEN 1 ELSE 0 END)        AS ausentes,
+        SUM(mc.total_membros_culto)                                   AS total_registos,
         ROUND(
           SUM(CASE WHEN f.presente = true THEN 1 ELSE 0 END)::numeric
-          / NULLIF(COUNT(f.id), 0) * 100, 1
+          / NULLIF(SUM(mc.total_membros_culto), 0) * 100, 1
         ) AS taxa_presenca
       FROM cultos c
-      LEFT JOIN frequencias f ON f.culto_id = c.id
+      LEFT JOIN frequencias f ON f.culto_id = c.id AND f.presente = true
+      -- ✅ subquery: quantos membros estavam elegíveis para cada culto
+      CROSS JOIN LATERAL (
+        SELECT COUNT(*) AS total_membros_culto
+        FROM membros m
+        WHERE m.ativo = true
+          AND (c.inter_filial = true OR m.branch_id = c.branch_id)
+      ) mc
       WHERE 1=1 ${filter}
       GROUP BY TO_CHAR(c.data, 'Mon YYYY'), TO_CHAR(c.data, 'YYYY-MM')
       ORDER BY mes_ordem ASC
     `, params);
- 
+
     res.json({ success: true, dados: result.rows });
   } catch (err) {
     console.error('[presencasPorMes]', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
- 
-// ── Presenças por culto ──────────────────────────────────────────────────────
+
+// ── Presenças por culto (CORRIGIDO) ───────────────────────────────────────────
 export const presencasPorCulto = async (req, res) => {
   const { filter, params } = branchScope(req.user);
   try {
@@ -416,21 +434,29 @@ export const presencasPorCulto = async (req, res) => {
         c.data,
         TO_CHAR(c.data, 'DD/MM')  AS data_curta,
         c.pregador,
-        COUNT(CASE WHEN f.presente = true  THEN 1 END) AS presentes,
-        COUNT(CASE WHEN f.presente = false THEN 1 END) AS ausentes,
-        COUNT(f.id)                                    AS total,
+        COUNT(CASE WHEN f.presente = true THEN 1 END)      AS presentes,
+        -- ✅ ausentes = membros elegíveis - presentes confirmados
+        mc.total_membros_culto
+          - COUNT(CASE WHEN f.presente = true THEN 1 END)   AS ausentes,
+        mc.total_membros_culto                              AS total,
         ROUND(
           COUNT(CASE WHEN f.presente = true THEN 1 END)::numeric
-          / NULLIF(COUNT(f.id), 0) * 100, 1
+          / NULLIF(mc.total_membros_culto, 0) * 100, 1
         ) AS taxa_presenca
       FROM cultos c
       LEFT JOIN frequencias f ON f.culto_id = c.id
+      CROSS JOIN LATERAL (
+        SELECT COUNT(*) AS total_membros_culto
+        FROM membros m
+        WHERE m.ativo = true
+          AND (c.inter_filial = true OR m.branch_id = c.branch_id)
+      ) mc
       WHERE 1=1 ${filter}
-      GROUP BY c.id, c.tipo, c.data, c.pregador
+      GROUP BY c.id, c.tipo, c.data, c.pregador, mc.total_membros_culto
       ORDER BY c.data DESC
       LIMIT 10
     `, params);
- 
+
     res.json({ success: true, dados: result.rows });
   } catch (err) {
     console.error('[presencasPorCulto]', err.message);

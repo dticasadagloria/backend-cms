@@ -217,9 +217,13 @@ app.listen(PORT, async () => {
   iniciarScheduler();
 
   try {
-    const res = await query("SELECT NOW()");
-    console.log("Database connected:", res.rows[0].now);
-  } catch (err) {
-    console.error("Database connection error:", err.message);
-  }
+  const res = await query("SELECT NOW()");
+  console.log("Database connected:", res.rows[0].now);
+} catch (err) {
+  console.error("===== DATABASE ERROR =====");
+  console.dir(err, { depth: null });
+  console.error("message:", err?.message);
+  console.error("code:", err?.code);
+  console.error("stack:", err?.stack);
+}
 });
