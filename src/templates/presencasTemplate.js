@@ -6,6 +6,9 @@ export const gerarPresencasHTML = ({
 
   const totalGeral = totalPresencasCard + totalVisitantesCard;
 
+  // Verifica se algum culto do relatório é inter-filial, para decidir se mostramos a legenda geral
+  const temInterFilial = cultos.some((c) => c.inter_filial);
+
   return `
     <!DOCTYPE html>
     <html>
@@ -25,6 +28,7 @@ export const gerarPresencasHTML = ({
         .badge-green { background: #d1fae5; color: #065f46; }
         .badge-red   { background: #fee2e2; color: #991b1b; }
         .badge-amber { background: #fef3c7; color: #92400e; }
+        .badge-blue  { background: #dbeafe; color: #1e40af; }
         .section-title { font-size: 13px; font-weight: bold; color: #1e293b; margin: 20px 0 10px; border-left: 3px solid #b6852e; padding-left: 8px; }
         .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 10px; }
         .summary { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -33,6 +37,21 @@ export const gerarPresencasHTML = ({
         .summary-card .label { font-size: 10px; color: #64748b; margin-top: 2px; }
         .summary-card.highlight { background: #fef3c7; border-color: #b6852e; }
         .summary-card.highlight .value { color: #92400e; }
+        .nota-metodologia {
+          background: #FFF8E1;
+          border-left: 4px solid #E2962B;
+          padding: 10px 14px;
+          margin: 10px 0 20px;
+          font-size: 10.5px;
+          color: #5a4a1f;
+          border-radius: 4px;
+        }
+        .nota-metodologia strong { color: #92400e; }
+        .nota-culto-inline {
+          font-size: 9.5px;
+          color: #92400e;
+          font-style: italic;
+        }
       </style>
     </head>
     <body>
@@ -76,6 +95,16 @@ export const gerarPresencasHTML = ({
         </div>
       </div>
 
+      ${temInterFilial ? `
+        <div class="nota-metodologia">
+          ℹ️ <strong>Nota sobre cultos Inter-Filiais:</strong> quando um culto é marcado como
+          <strong>Inter-Filial</strong>, o número de "Ausentes" é calculado sobre o total de
+          membros ativos de <strong>todas as filiais da igreja</strong>, e não apenas da filial
+          onde o culto ocorreu. Isto está assinalado com <span class="badge badge-blue">Inter-Filial</span>
+          na tabela abaixo.
+        </div>
+      ` : ""}
+
       <!-- Tabela de cultos -->
       <div class="section-title">Detalhes por Culto</div>
       <table>
@@ -84,6 +113,7 @@ export const gerarPresencasHTML = ({
             <th>Data</th>
             <th>Tipo</th>
             <th>Filial</th>
+            <th>Âmbito</th>
             <th>Membros</th>
             <th>Ausentes</th>
             <th>Visitantes</th>
@@ -102,8 +132,20 @@ export const gerarPresencasHTML = ({
                 <td>${c.data_formatada}</td>
                 <td>${c.tipo}</td>
                 <td>${c.nome_branch || "—"}</td>
+                <td>
+                  ${c.inter_filial
+                    ? '<span class="badge badge-blue">Inter-Filial</span>'
+                    : '<span class="badge badge-amber">Filial</span>'
+                  }
+                </td>
                 <td><span class="badge badge-green">${c.presentes}</span></td>
-                <td><span class="badge badge-red">${c.ausentes}</span></td>
+                <td>
+                  <span class="badge badge-red">${c.ausentes}</span>
+                  ${c.inter_filial
+                    ? `<div class="nota-culto-inline">*base: ${c.total_membros_culto ?? "—"} membros (todas as filiais)</div>`
+                    : ""
+                  }
+                </td>
                 <td>${vis}</td>
                 <td><strong>${totalCulto}</strong></td>
                 <td>${conv}</td>
@@ -190,7 +232,10 @@ export const gerarPresencasHTML = ({
       }).join("")}
 
       <div class="footer">
-        Sistema de Gestão IICGP · Relatório gerado automaticamente
+        Sistema de Gestão IICGP · Relatório gerado automaticamente<br>
+        Metodologia: Ausentes = Total de membros ativos elegíveis − Presentes.
+        Em cultos marcados como <strong>Inter-Filial</strong>, "membros ativos elegíveis"
+        inclui todas as filiais da igreja; caso contrário, apenas a filial onde o culto ocorreu.
       </div>
     </body>
     </html>

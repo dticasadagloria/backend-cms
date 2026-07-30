@@ -1,2 +1,4 @@
 node_modules
 .env
+INVESTIGACAO_PRESENCAS.sql
+diagnose_system.js
