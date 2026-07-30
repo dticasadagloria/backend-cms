@@ -274,9 +274,16 @@ export const reactivateMembroHandler = async (req, res) => {
 };
 
 // ── Membros sem célula ───────────────────────────────────────────────────────
+// ✅ filtra por filial do utilizador autenticado (não-Admin só vê a própria
+// filial); Admin (role_id 1 ou 2) continua a ver todas — mesmo padrão já
+// usado no endpoint /exportar/call-center/pdf.
 export const membrosSemCelula = async (req, res) => {
+  const { role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+
   try {
-    const result = await query(`
+    const result = await query(
+      `
       SELECT
         m.id,
         m.nome AS nome_membro,
@@ -286,16 +293,23 @@ export const membrosSemCelula = async (req, res) => {
       FROM membros m
       LEFT JOIN branches b ON m.branch_id = b.id
       WHERE m.celula_id IS NULL
+        ${!isAdmin ? "AND m.branch_id = $1" : ""}
       ORDER BY m.nome ASC
-    `);
+    `,
+      isAdmin ? [] : [branch_id],
+    );
 
-    const statsResult = await query(`
+    const statsResult = await query(
+      `
       SELECT
         COUNT(*)                    as total,
         COUNT(celula_id)            as com_celula,
         COUNT(*) - COUNT(celula_id) as sem_celula
       FROM membros
-    `);
+      ${!isAdmin ? "WHERE branch_id = $1" : ""}
+    `,
+      isAdmin ? [] : [branch_id],
+    );
 
     const s = statsResult.rows[0];
 
