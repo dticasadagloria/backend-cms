@@ -162,15 +162,16 @@ export const salvarPresencas = async (req, res) => {
   try {
     if (presencas.length > 0) {
       await query(`
-        INSERT INTO frequencias (membro_id, culto_id, presente)
-        SELECT t.membro_id, $2::int, t.presente
-        FROM UNNEST($1::int[], $3::boolean[]) AS t(membro_id, presente)
+        INSERT INTO frequencias (membro_id, culto_id, presente, observacao)
+        SELECT t.membro_id, $2::int, t.presente, t.observacao
+        FROM UNNEST($1::int[], $3::boolean[], $4::text[]) AS t(membro_id, presente, observacao)
         ON CONFLICT (membro_id, culto_id)
-        DO UPDATE SET presente = EXCLUDED.presente
+        DO UPDATE SET presente = EXCLUDED.presente, observacao = EXCLUDED.observacao
       `, [
         presencas.map((p) => p.membro_id),
         culto_id,
         presencas.map((p) => p.presente === true),
+        presencas.map((p) => p.observacao || null),
       ]);
     }
 
