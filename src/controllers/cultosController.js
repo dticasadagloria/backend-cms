@@ -150,30 +150,28 @@ export const apagarCulto = async (req, res) => {
   }
 };
 
-// ── Salvar presenças ─────────────────────────────────────────────────────────
+// ── Salvar presenças (CORRIGIDO) ──────────────────────────────────────────────
+// Antes: o ramo "ausentes" fazia INSERT ... ON CONFLICT DO NOTHING, que não
+// actualiza uma linha já existente — desmarcar um membro previamente marcado
+// presente=true não persistia. Agora: upsert único usando sempre o valor
+// recebido (EXCLUDED.presente), simétrico para true e false.
 export const salvarPresencas = async (req, res) => {
   const { id: culto_id } = req.params;
   const { presencas }    = req.body;
 
   try {
-    const presentes = presencas.filter((p) => p.presente === true);
-    const ausentes  = presencas.filter((p) => p.presente === false);
-
-    if (presentes.length > 0) {
+    if (presencas.length > 0) {
       await query(`
         INSERT INTO frequencias (membro_id, culto_id, presente)
-        SELECT UNNEST($1::int[]), $2, true
+        SELECT t.membro_id, $2::int, t.presente
+        FROM UNNEST($1::int[], $3::boolean[]) AS t(membro_id, presente)
         ON CONFLICT (membro_id, culto_id)
-        DO UPDATE SET presente = true
-      `, [presentes.map((p) => p.membro_id), culto_id]);
-    }
-
-    if (ausentes.length > 0) {
-      await query(`
-        INSERT INTO frequencias (membro_id, culto_id, presente)
-        SELECT UNNEST($1::int[]), $2, false
-        ON CONFLICT (membro_id, culto_id) DO NOTHING
-      `, [ausentes.map((p) => p.membro_id), culto_id]);
+        DO UPDATE SET presente = EXCLUDED.presente
+      `, [
+        presencas.map((p) => p.membro_id),
+        culto_id,
+        presencas.map((p) => p.presente === true),
+      ]);
     }
 
     await query(`
