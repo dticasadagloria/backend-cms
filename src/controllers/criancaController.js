@@ -4,7 +4,11 @@ import {
   createCrianca,
   updateCrianca,
   deactivateCrianca,
-  getPresencasByData,
+  findAulaDuplicada,
+  createAula,
+  getAllAulas,
+  findAulaById,
+  getPresencasByAula,
   markPresenca,
   getHistoricoPresencas,
   getStatsCriancas,
@@ -87,16 +91,75 @@ export const deactivateCriancaHandler = async (req, res) => {
   }
 };
 
-// ==================== GET PRESENÇAS (CHAMADA) ====================
-// GET /api/criancas/presencas?data=2026-07-26&turma=Grandes
-export const getPresencasHandler = async (req, res) => {
-  const { data, turma } = req.query;
+// ==================== AULAS ====================
+
+// GET /api/aulas — lista aulas (Admin/Pastor veem todas as filiais; resto só a própria)
+export const listarAulasHandler = async (req, res) => {
+  const { role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
 
   try {
-    if (!data) return res.status(400).json({ message: 'Data é obrigatória (?data=YYYY-MM-DD)' });
+    const filter = isAdmin ? '' : 'AND a.branch_id = $1';
+    const params = isAdmin ? [] : [branch_id];
+    const aulas = await getAllAulas(filter, params);
+    res.status(200).json({ success: true, count: aulas.length, aulas });
+  } catch (error) {
+    console.error('💥 LISTAR AULAS ERROR:', error.message);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
 
-    const presencas = await getPresencasByData(data, turma || null);
-    res.status(200).json({ success: true, data, turma: turma || 'todas', presencas });
+export const obterAulaHandler = async (req, res) => {
+  try {
+    const aula = await findAulaById(req.params.id);
+    if (!aula) return res.status(404).json({ message: 'Aula não encontrada' });
+    res.status(200).json({ aula });
+  } catch (error) {
+    console.error('💥 OBTER AULA ERROR:', error.message);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// POST /api/aulas — cria aula; bloqueia duplicados (mesma data+turma+filial), mesmo padrão de criarCulto
+export const criarAulaHandler = async (req, res) => {
+  const { role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+  const { data, horario, turma, tema, professor, observacoes } = req.body;
+  const filial = isAdmin ? (req.body.branch_id || branch_id) : branch_id;
+
+  try {
+    if (!data) return res.status(400).json({ message: 'Data é obrigatória' });
+    if (!turma || !['Pequenos', 'Grandes'].includes(turma)) {
+      return res.status(400).json({ message: 'Turma deve ser "Pequenos" ou "Grandes"' });
+    }
+    if (!filial) return res.status(400).json({ message: 'Selecciona uma filial' });
+
+    const duplicada = await findAulaDuplicada(data, turma, filial);
+    if (duplicada) {
+      return res.status(409).json({ message: `Já existe uma aula "${turma}" nesta data e filial (ID ${duplicada.id}).` });
+    }
+
+    const aula = await createAula({ branch_id: filial, data, horario, turma, tema, professor, observacoes }, req.user.id);
+    res.status(201).json({ message: 'Aula criada com sucesso', aula });
+  } catch (error) {
+    console.error('💥 CRIAR AULA ERROR:', error.message);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// ==================== GET PRESENÇAS (CHAMADA) ====================
+// GET /api/criancas/presencas/dia?aula_id=1
+export const getPresencasHandler = async (req, res) => {
+  const { aula_id } = req.query;
+
+  try {
+    if (!aula_id) return res.status(400).json({ message: 'aula_id é obrigatório' });
+
+    const aula = await findAulaById(aula_id);
+    if (!aula) return res.status(404).json({ message: 'Aula não encontrada' });
+
+    const presencas = await getPresencasByAula(aula_id, aula.turma);
+    res.status(200).json({ success: true, aula, presencas });
   } catch (error) {
     console.error('💥 GET PRESENCAS ERROR:', error.message);
     res.status(500).json({ message: 'Internal server error' });
@@ -104,16 +167,16 @@ export const getPresencasHandler = async (req, res) => {
 };
 
 // ==================== MARCAR PRESENÇA ====================
-// POST /api/criancas/presencas  { crianca_id, data_presenca, presente, turma }
+// POST /api/criancas/presencas  { crianca_id, aula_id, presente }
 export const markPresencaHandler = async (req, res) => {
-  const { crianca_id, data_presenca, presente, turma } = req.body;
+  const { crianca_id, aula_id, presente } = req.body;
 
   try {
-    if (!crianca_id || !data_presenca) {
-      return res.status(400).json({ message: 'crianca_id e data_presenca são obrigatórios' });
+    if (!crianca_id || !aula_id) {
+      return res.status(400).json({ message: 'crianca_id e aula_id são obrigatórios' });
     }
 
-    const result = await markPresenca(crianca_id, data_presenca, presente, turma, req.user.id);
+    const result = await markPresenca(crianca_id, aula_id, presente, req.user.id);
     res.status(200).json({ message: 'Presença registada', presenca: result });
   } catch (error) {
     console.error('💥 MARK PRESENCA ERROR:', error.message);
@@ -122,18 +185,18 @@ export const markPresencaHandler = async (req, res) => {
 };
 
 // ==================== MARCAR PRESENÇAS EM LOTE (chamada toda de uma vez) ====================
-// POST /api/criancas/presencas/lote  { data_presenca, turma, registos: [{crianca_id, presente}] }
+// POST /api/criancas/presencas/lote  { aula_id, registos: [{crianca_id, presente}] }
 export const markPresencasLoteHandler = async (req, res) => {
-  const { data_presenca, turma, registos } = req.body;
+  const { aula_id, registos } = req.body;
 
   try {
-    if (!data_presenca || !Array.isArray(registos)) {
-      return res.status(400).json({ message: 'data_presenca e registos[] são obrigatórios' });
+    if (!aula_id || !Array.isArray(registos)) {
+      return res.status(400).json({ message: 'aula_id e registos[] são obrigatórios' });
     }
 
     const resultados = [];
     for (const r of registos) {
-      const result = await markPresenca(r.crianca_id, data_presenca, r.presente, turma, req.user.id);
+      const result = await markPresenca(r.crianca_id, aula_id, r.presente, req.user.id);
       resultados.push(result);
     }
 

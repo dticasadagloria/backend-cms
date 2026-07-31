@@ -130,54 +130,103 @@ export const deactivateCrianca = async (id) => {
   return res.rows[0];
 };
 
+// ==================== AULAS ====================
+
+// Verifica se já existe uma aula igual (mesma data + turma + filial),
+// para o controller devolver 409 em vez de duplicar — mesmo padrão de criarCulto.
+export const findAulaDuplicada = async (data, turma, branch_id) => {
+  const text = `SELECT id FROM aulas WHERE data = $1 AND turma = $2 AND branch_id = $3`;
+  const res = await query(text, [data, turma, branch_id]);
+  return res.rows[0];
+};
+
+export const createAula = async (aula, userId) => {
+  const text = `
+    INSERT INTO aulas (branch_id, data, horario, turma, tema, professor, observacoes, criado_por)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING *
+  `;
+  const values = [
+    aula.branch_id,
+    aula.data,
+    aula.horario || null,
+    aula.turma,
+    aula.tema || null,
+    aula.professor || null,
+    aula.observacoes || null,
+    userId,
+  ];
+  const res = await query(text, values);
+  return res.rows[0];
+};
+
+export const getAllAulas = async (filter = '', params = []) => {
+  const text = `
+    SELECT a.*, b.nome AS nome_branch
+    FROM aulas a
+    LEFT JOIN branches b ON a.branch_id = b.id
+    WHERE 1=1 ${filter}
+    ORDER BY a.data DESC, a.horario DESC
+  `;
+  const res = await query(text, params);
+  return res.rows;
+};
+
+export const findAulaById = async (id) => {
+  const text = `
+    SELECT a.*, b.nome AS nome_branch
+    FROM aulas a
+    LEFT JOIN branches b ON a.branch_id = b.id
+    WHERE a.id = $1
+  `;
+  const res = await query(text, [id]);
+  return res.rows[0];
+};
+
 // ==================== PRESENÇAS ====================
 
-// Busca presenças de uma data específica (para a chamada)
-export const getPresencasByData = async (data_presenca, turma = null) => {
-  let text = `
-    SELECT 
+// Busca presenças de uma aula específica (para a chamada)
+export const getPresencasByAula = async (aula_id, turma) => {
+  const text = `
+    SELECT
       c.id AS crianca_id,
       c.nome,
       c.turma,
       p.id AS presenca_id,
       p.presente
     FROM criancas c
-    LEFT JOIN presencas_escolinha p 
-      ON p.crianca_id = c.id AND p.data_presenca = $1
-    WHERE c.ativo = true
+    LEFT JOIN presencas_escolinha p
+      ON p.crianca_id = c.id AND p.aula_id = $1
+    WHERE c.ativo = true AND c.turma = $2
+    ORDER BY c.nome ASC
   `;
-  const values = [data_presenca];
-
-  if (turma) {
-    text += ` AND c.turma = $2`;
-    values.push(turma);
-  }
-
-  text += ` ORDER BY c.nome ASC`;
-
-  const res = await query(text, values);
+  const res = await query(text, [aula_id, turma]);
   return res.rows;
 };
 
-// Regista/actualiza presença (upsert)
-export const markPresenca = async (crianca_id, data_presenca, presente, turma, userId) => {
+// Regista/actualiza presença (upsert simétrico — presente = EXCLUDED.presente
+// tanto para true como para false, sem o bug de ON CONFLICT DO NOTHING já
+// corrigido no módulo de Cultos)
+export const markPresenca = async (crianca_id, aula_id, presente, userId) => {
   const text = `
-    INSERT INTO presencas_escolinha (crianca_id, data_presenca, presente, turma, registado_por)
-    VALUES ($1, $2, $3, $4, $5)
-    ON CONFLICT (crianca_id, data_presenca)
-    DO UPDATE SET presente = $3, registado_por = $5
+    INSERT INTO presencas_escolinha (crianca_id, aula_id, presente, registado_por)
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT (crianca_id, aula_id)
+    DO UPDATE SET presente = EXCLUDED.presente, registado_por = EXCLUDED.registado_por
     RETURNING *
   `;
-  const res = await query(text, [crianca_id, data_presenca, presente, turma, userId]);
+  const res = await query(text, [crianca_id, aula_id, presente === true, userId]);
   return res.rows[0];
 };
 
-// Histórico de presenças de uma criança
+// Histórico de presenças de uma criança (com data/turma/tema via JOIN a aulas)
 export const getHistoricoPresencas = async (crianca_id) => {
   const text = `
-    SELECT * FROM presencas_escolinha
-    WHERE crianca_id = $1
-    ORDER BY data_presenca DESC
+    SELECT p.*, a.data, a.turma, a.tema, a.professor
+    FROM presencas_escolinha p
+    JOIN aulas a ON a.id = p.aula_id
+    WHERE p.crianca_id = $1
+    ORDER BY a.data DESC
     LIMIT 20
   `;
   const res = await query(text, [crianca_id]);

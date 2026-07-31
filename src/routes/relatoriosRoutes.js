@@ -3,6 +3,7 @@ import { query } from "../config/db.js";
 import { authenticate } from "../middleware/authMiddleware.js";
 import { gerarPresencasHTML } from "../templates/presencasTemplate.js";
 import { gerarFichaOfertasHTML } from "../templates/fichaOfertas.js";
+import { gerarEscolinhaHTML } from "../templates/escolinhaTemplate.js";
 
 const router = express.Router();
 
@@ -377,6 +378,193 @@ router.get("/ofertas/csv/:culto_id", authenticate, async (req, res) => {
     res.send("﻿" + csvLines.join("\n"));
   } catch (err) {
     console.error("ofertas/csv error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── Escolinha da Verdade: dados do relatório ──────────────────────────────────
+router.get("/escolinha", authenticate, async (req, res) => {
+  const { role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+  const { aula_id, mes } = req.query;
+
+  try {
+    let conditions = isAdmin ? [] : [`a.branch_id = $1`];
+    let params = isAdmin ? [] : [branch_id];
+    let idx = params.length + 1;
+
+    if (aula_id) {
+      conditions.push(`a.id = $${idx++}`);
+      params.push(aula_id);
+    }
+    if (mes) {
+      conditions.push(`TO_CHAR(a.data, 'YYYY-MM') = $${idx++}`);
+      params.push(mes);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    // ✅ ausentes = crianças activas elegíveis (mesma turma + filial da aula) - presentes confirmados
+    const aulas = await query(
+      `
+      SELECT
+        a.id, a.data, a.horario, a.turma, a.tema, a.professor,
+        TO_CHAR(a.data, 'DD/MM/YYYY') as data_formatada,
+        b.nome as nome_branch,
+        COUNT(CASE WHEN p.presente = true THEN 1 END) as presentes,
+        mc.total_criancas - COUNT(CASE WHEN p.presente = true THEN 1 END) as ausentes,
+        mc.total_criancas as total_criancas,
+        ROUND(COUNT(CASE WHEN p.presente = true THEN 1 END)::numeric / NULLIF(mc.total_criancas, 0) * 100, 1) as taxa
+      FROM aulas a
+      LEFT JOIN branches b ON a.branch_id = b.id
+      LEFT JOIN presencas_escolinha p ON p.aula_id = a.id
+      CROSS JOIN LATERAL (
+        SELECT COUNT(*) AS total_criancas
+        FROM criancas c
+        WHERE c.ativo = true AND c.turma = a.turma AND c.branch_id = a.branch_id
+      ) mc
+      ${where}
+      GROUP BY a.id, a.data, a.horario, a.turma, a.tema, a.professor, b.nome, mc.total_criancas
+      ORDER BY a.data DESC
+    `,
+      params,
+    );
+
+    res.json({ success: true, dados: aulas.rows });
+  } catch (err) {
+    console.error("relatorio escolinha error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── Escolinha da Verdade: exportar CSV ────────────────────────────────────────
+router.get("/escolinha/exportar/csv", authenticate, async (req, res) => {
+  const { role_id, branch_id } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+  const { aula_id, mes } = req.query;
+
+  try {
+    let conditions = isAdmin ? [] : [`a.branch_id = $1`];
+    let params = isAdmin ? [] : [branch_id];
+    let idx = params.length + 1;
+
+    if (aula_id) { conditions.push(`a.id = $${idx++}`); params.push(aula_id); }
+    if (mes)     { conditions.push(`TO_CHAR(a.data, 'YYYY-MM') = $${idx++}`); params.push(mes); }
+
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const result = await query(
+      `
+      SELECT
+        TO_CHAR(a.data, 'DD/MM/YYYY') as "Data",
+        a.turma                        as "Turma",
+        COALESCE(a.tema, '—')          as "Tema",
+        b.nome                         as "Filial",
+        COUNT(CASE WHEN p.presente = true THEN 1 END) as "Presentes",
+        mc.total_criancas - COUNT(CASE WHEN p.presente = true THEN 1 END) as "Ausentes",
+        mc.total_criancas as "Total Crianças",
+        ROUND(COUNT(CASE WHEN p.presente = true THEN 1 END)::numeric / NULLIF(mc.total_criancas, 0) * 100, 1) as "Taxa %"
+      FROM aulas a
+      LEFT JOIN branches b ON a.branch_id = b.id
+      LEFT JOIN presencas_escolinha p ON p.aula_id = a.id
+      CROSS JOIN LATERAL (
+        SELECT COUNT(*) AS total_criancas
+        FROM criancas c
+        WHERE c.ativo = true AND c.turma = a.turma AND c.branch_id = a.branch_id
+      ) mc
+      ${where}
+      GROUP BY a.id, a.data, a.turma, a.tema, b.nome, mc.total_criancas
+      ORDER BY a.data DESC
+    `,
+      params,
+    );
+
+    const headers = Object.keys(result.rows[0] || {});
+    const csvLines = [
+      headers.join(","),
+      ...result.rows.map((row) => headers.map((h) => `"${row[h] ?? ""}"`).join(",")),
+    ];
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="relatorio_escolinha_${mes || "geral"}.csv"`);
+    res.send("﻿" + csvLines.join("\n"));
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── Escolinha da Verdade: exportar PDF ────────────────────────────────────────
+router.get("/escolinha/exportar/pdf", authenticate, async (req, res) => {
+  const { role_id, branch_id, username } = req.user;
+  const isAdmin = role_id === 1 || role_id === 2;
+  const { aula_id, mes } = req.query;
+
+  try {
+    let conditions = isAdmin ? [] : [`a.branch_id = $1`];
+    let params = isAdmin ? [] : [branch_id];
+    let idx = params.length + 1;
+
+    if (aula_id) { conditions.push(`a.id = $${idx++}`); params.push(aula_id); }
+    if (mes)     { conditions.push(`TO_CHAR(a.data, 'YYYY-MM') = $${idx++}`); params.push(mes); }
+
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const aulas = await query(
+      `
+      SELECT
+        a.id, a.turma, a.tema, a.professor,
+        TO_CHAR(a.data, 'DD/MM/YYYY') as data_formatada,
+        b.nome as nome_branch,
+        COUNT(CASE WHEN p.presente = true THEN 1 END) as presentes,
+        mc.total_criancas - COUNT(CASE WHEN p.presente = true THEN 1 END) as ausentes,
+        mc.total_criancas as total_criancas,
+        ROUND(COUNT(CASE WHEN p.presente = true THEN 1 END)::numeric / NULLIF(mc.total_criancas, 0) * 100, 1) as taxa
+      FROM aulas a
+      LEFT JOIN branches b ON a.branch_id = b.id
+      LEFT JOIN presencas_escolinha p ON p.aula_id = a.id
+      CROSS JOIN LATERAL (
+        SELECT COUNT(*) AS total_criancas
+        FROM criancas c
+        WHERE c.ativo = true AND c.turma = a.turma AND c.branch_id = a.branch_id
+      ) mc
+      ${where}
+      GROUP BY a.id, a.turma, a.tema, a.professor, a.data, b.nome, mc.total_criancas
+      ORDER BY a.data DESC
+    `,
+      params,
+    );
+
+    const aulaIds = aulas.rows.map((a) => a.id);
+    const presentes = aulaIds.length > 0
+      ? await query(`
+          SELECT c.nome AS nome_crianca, b.nome AS nome_branch, p.aula_id
+          FROM presencas_escolinha p
+          LEFT JOIN criancas c ON p.crianca_id = c.id
+          LEFT JOIN branches b ON c.branch_id = b.id
+          WHERE p.presente = true AND p.aula_id = ANY($1::int[])
+          ORDER BY p.aula_id, c.nome ASC
+        `, [aulaIds]).catch(() => ({ rows: [] }))
+      : { rows: [] };
+
+    const totalPresencasCard = aulas.rows.reduce((s, a) => s + parseInt(a.presentes || 0), 0);
+
+    const titulo = mes
+      ? `Relatório Escolinha da Verdade — ${mes}`
+      : aula_id ? `Relatório Escolinha da Verdade — Aula`
+      : "Relatório Geral — Escolinha da Verdade";
+
+    const html = gerarEscolinhaHTML({
+      titulo,
+      username,
+      aulas: aulas.rows,
+      presentes: presentes.rows,
+      totalPresencasCard,
+      aula_id,
+    });
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
+  } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
