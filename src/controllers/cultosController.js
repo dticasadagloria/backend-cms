@@ -21,12 +21,34 @@ export const criarCulto = async (req, res) => {
   const { role_id, branch_id } = req.user;
   const isAdmin = role_id === 1 || role_id === 2;
   const filial  = isAdmin ? (req.body.branch_id || branch_id) : branch_id;
+  const interFilialBool = inter_filial || false;
+
+  // ✅ Um culto não-inter-filial tem de pertencer a uma filial — caso contrário
+  // fica "órfão" (branch_id NULL) e nenhum membro é elegível para ele.
+  if (!interFilialBool && !filial) {
+    return res.status(400).json({
+      success: false,
+      error: "Selecciona uma filial, ou marca o culto como Inter-Filial.",
+    });
+  }
 
   try {
+    // ✅ Evita criar o mesmo culto duas vezes (mesma data, tipo e filial).
+    const existente = await query(
+      `SELECT id FROM cultos WHERE data = $1 AND tipo = $2 AND branch_id IS NOT DISTINCT FROM $3`,
+      [data, tipo, filial || null],
+    );
+    if (existente.rows.length > 0) {
+      return res.status(409).json({
+        success: false,
+        error: `Já existe um culto "${tipo}" nesta data e filial (ID ${existente.rows[0].id}).`,
+      });
+    }
+
     const result = await query(`
       INSERT INTO cultos (branch_id, data, tipo, categoria, pregador, horario, inter_filial, tipo_registo)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *
-    `, [filial, data, tipo, categoria || "Culto", pregador, horario, inter_filial || false, tipo_registo || "presencas"]);
+    `, [filial, data, tipo, categoria || "Culto", pregador, horario, interFilialBool, tipo_registo || "presencas"]);
 
     const culto = result.rows[0];
     await logActivity(req, {
@@ -431,7 +453,13 @@ export const presencasPorCulto = async (req, res) => {
         c.id,
         c.tipo,
         c.data,
-        TO_CHAR(c.data, 'DD/MM')  AS data_curta,
+        -- ✅ quando há mais de um culto no mesmo dia (ex: 7h e 10h), acrescenta
+        -- o horário para não aparecerem com a mesma etiqueta no eixo do gráfico.
+        CASE
+          WHEN COUNT(*) OVER (PARTITION BY c.data) > 1 AND c.horario IS NOT NULL
+            THEN TO_CHAR(c.data, 'DD/MM') || ' ' || c.horario::text
+          ELSE TO_CHAR(c.data, 'DD/MM')
+        END AS data_curta,
         c.pregador,
         COUNT(CASE WHEN f.presente = true THEN 1 END)      AS presentes,
         -- ✅ ausentes = membros elegíveis - presentes confirmados
