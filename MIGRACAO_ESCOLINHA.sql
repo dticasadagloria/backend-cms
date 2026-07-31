@@ -46,3 +46,9 @@ ALTER TABLE presencas_escolinha ADD CONSTRAINT presencas_escolinha_crianca_aula_
 -- 7. Remove as colunas antigas, agora redundantes (info já vem de aulas via JOIN)
 ALTER TABLE presencas_escolinha DROP COLUMN data_presenca;
 ALTER TABLE presencas_escolinha DROP COLUMN turma;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Extra: campo "idade" (inteiro) em vez de "data_nascimento" no cadastro de crianças
+-- ═══════════════════════════════════════════════════════════════════════════
+ALTER TABLE criancas ADD COLUMN idade INTEGER;
+ALTER TABLE criancas DROP COLUMN data_nascimento;

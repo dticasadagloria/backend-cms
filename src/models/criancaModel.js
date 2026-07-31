@@ -70,7 +70,7 @@ export const createCrianca = async (data, userId) => {
 
   const text = `
     INSERT INTO criancas (
-      codigo, nome, genero, data_nascimento, turma,
+      codigo, nome, genero, idade, turma,
       nome_encarregado, contacto_encarregado, branch_id, observacoes, criado_por
     )
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -80,7 +80,7 @@ export const createCrianca = async (data, userId) => {
     codigoAuto, // <--- Código gerado automaticamente
     data.nome,
     data.genero || null,
-    data.data_nascimento || null,
+    data.idade || null,
     data.turma,
     data.nome_encarregado || null,
     data.contacto_encarregado || null,
@@ -99,7 +99,7 @@ export const updateCrianca = async (id, data) => {
       codigo = $1,
       nome = $2,
       genero = $3,
-      data_nascimento = $4,
+      idade = $4,
       turma = $5,
       nome_encarregado = $6,
       contacto_encarregado = $7,
@@ -112,7 +112,7 @@ export const updateCrianca = async (id, data) => {
     data.codigo || null,
     data.nome,
     data.genero || null,
-    data.data_nascimento || null,
+    data.idade || null,
     data.turma,
     data.nome_encarregado || null,
     data.contacto_encarregado || null,
