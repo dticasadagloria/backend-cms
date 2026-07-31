@@ -17,7 +17,7 @@ export const inactivosTemplate = (membros, { username, dataGeracao, total, ativo
   <meta charset="UTF-8">
   <title>SOS Socorros — Membros Inactivos</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: text; user-select: text; }
     body { font-family: Arial, sans-serif; font-size: 12px; color: #1e293b; padding: 30px; }
 
     .header { text-align: center; margin-bottom: 28px; border-bottom: 2px solid #b6852e; padding-bottom: 16px; }
