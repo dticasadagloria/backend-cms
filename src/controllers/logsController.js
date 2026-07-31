@@ -3,7 +3,10 @@ import { gerarLogsHTML } from "../templates/logsTemplate.js";
 
 export const listarLogs = async (req, res) => {
   const { role_id, branch_id } = req.user;
-  const isAdmin = role_id === 1 || role_id === 2 || role_id === 8 || role_id === 12; // Admin, SuperAdmin ou Sede
+  // Só Admin (1) e Pastor (2) são "supers" — veem logs de todas as filiais,
+  // incluindo logins. Os restantes roles com acesso a esta rota (8, 12, 13, 14)
+  // só veem logs de utilizadores da própria filial (filtro abaixo).
+  const isAdmin = role_id === 1 || role_id === 2;
 
   const {
     page        = 1,
@@ -100,7 +103,8 @@ export const listarLogs = async (req, res) => {
 // ── Exportar logs como HTML (imprimível / save-as-PDF) ───────────────────────
 export const exportarLogsPDF = async (req, res) => {
   const { role_id, branch_id, username } = req.user;
-  const isAdmin = role_id === 1 || role_id === 2 ; // Admin, SuperAdmin ou Sede
+  // Mesma regra do listarLogs: só 1 (Admin) e 2 (Pastor) são supers.
+  const isAdmin = role_id === 1 || role_id === 2;
 
   const { action, entity_type, from, to, search, branch_id: filterBranch } = req.query;
 
