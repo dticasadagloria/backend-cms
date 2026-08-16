@@ -207,10 +207,15 @@ export const getPresencasByAula = async (aula_id, turma) => {
 // Regista/actualiza presença (upsert simétrico — presente = EXCLUDED.presente
 // tanto para true como para false, sem o bug de ON CONFLICT DO NOTHING já
 // corrigido no módulo de Cultos)
+//
+// data_presenca vem sempre da própria aula (subquery por aula_id), nunca do
+// pedido — nem o frontend web nem o mobile mandam essa data no payload, e não
+// devem: a data de uma presença é a data da aula a que pertence, não um
+// valor independente que cada chamador tenha de saber replicar.
 export const markPresenca = async (crianca_id, aula_id, presente, userId) => {
   const text = `
-    INSERT INTO presencas_escolinha (crianca_id, aula_id, presente, registado_por)
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO presencas_escolinha (crianca_id, aula_id, presente, registado_por, data_presenca)
+    VALUES ($1, $2, $3, $4, (SELECT data FROM aulas WHERE id = $2))
     ON CONFLICT (crianca_id, aula_id)
     DO UPDATE SET presente = EXCLUDED.presente, registado_por = EXCLUDED.registado_por
     RETURNING *
