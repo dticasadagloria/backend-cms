@@ -22,16 +22,19 @@ export const findUserByUsername = async (username) => {
 //CORRIGIDO: faz JOIN com roles para retornar role_nome
 export const findUserById = async (id) => {
   const text = `
-    SELECT 
-      u.id, 
-      u.username, 
+    SELECT
+      u.id,
+      u.username,
       u.role_id,
+      u.branch_id,
+      b.nome     AS branch_nome,
       r.nome     AS role_nome,
       r.descricao AS role_descricao,
-      u.ativo, 
+      u.ativo,
       u.data_criacao
     FROM users u
     LEFT JOIN roles r ON u.role_id = r.id
+    LEFT JOIN branches b ON u.branch_id = b.id
     WHERE u.id = $1
   `;
   const res = await query(text, [id]);
