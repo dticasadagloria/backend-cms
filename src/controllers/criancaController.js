@@ -96,7 +96,7 @@ export const deactivateCriancaHandler = async (req, res) => {
 // GET /api/aulas — lista aulas (Admin/Pastor veem todas as filiais; resto só a própria)
 export const listarAulasHandler = async (req, res) => {
   const { role_id, branch_id } = req.user;
-  const isAdmin = role_id === 1 || role_id === 2;
+  const isAdmin = role_id === 1 || role_id === 2 || role_id === 5; // Admin, Pastor, Professores
 
   try {
     const filter = isAdmin ? '' : 'AND a.branch_id = $1';
@@ -123,7 +123,7 @@ export const obterAulaHandler = async (req, res) => {
 // POST /api/aulas — cria aula; bloqueia duplicados (mesma data+turma+filial), mesmo padrão de criarCulto
 export const criarAulaHandler = async (req, res) => {
   const { role_id, branch_id } = req.user;
-  const isAdmin = role_id === 1 || role_id === 2;
+  const isAdmin = role_id === 1 || role_id === 2 || role_id === 5; // Admin, Pastor, Professores
   const { data, horario, turma, tema, professor, observacoes } = req.body;
   const filial = isAdmin ? (req.body.branch_id || branch_id) : branch_id;
 

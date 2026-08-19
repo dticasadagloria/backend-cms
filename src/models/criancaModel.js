@@ -35,49 +35,21 @@ export const findCriancaById = async (id) => {
   return res.rows[0];
 };
 
-// ==================== GERAR CÓDIGO AUTOMÁTICO ====================
-export const gerarProximoCodigo = async () => {
-  // Busca o último código registado na tabela criancas que comece por 'C'
-  const text = `
-    SELECT codigo 
-    FROM criancas 
-    WHERE codigo LIKE 'C%' 
-    ORDER BY id DESC 
-    LIMIT 1
-  `;
-  const res = await query(text);
-
-  // Se ainda não existir nenhum registo, inicia em C001
-  if (res.rows.length === 0 || !res.rows[0].codigo) {
-    return 'C001';
-  }
-
-  const ultimoCodigo = res.rows[0].codigo; // Ex: "C007"
-
-  // Extrai a parte numérica removendo o prefixo 'C'
-  const numeroAtual = parseInt(ultimoCodigo.replace('C', ''), 10);
-
-  // Incrementa +1 ao número extraído
-  const proximoNumero = isNaN(numeroAtual) ? 1 : numeroAtual + 1;
-
-  // Formata de volta no padrão C000 (ex: 8 -> "C008")
-  return `C${String(proximoNumero).padStart(3, '0')}`;
-};
-
 export const createCrianca = async (data, userId) => {
-  // Gera automaticamente o próximo código e ignora qualquer valor enviado do frontend
-  const codigoAuto = await gerarProximoCodigo();
-
+  // codigo NÃO é enviado aqui de propósito — a geração agora vive na base de
+  // dados (trigger trg_gerar_codigo_crianca, ver migrations/criancas_codigo_auto.sql),
+  // que corre para QUALQUER insert na tabela `criancas`, não só os feitos pela
+  // API. Gerar aqui também (como antes, via gerarProximoCodigo) duplicaria a
+  // lógica e reintroduziria o risco de colisão que a sequence na BD evita.
   const text = `
     INSERT INTO criancas (
-      codigo, nome, genero, idade, turma,
+      nome, genero, idade, turma,
       nome_encarregado, contacto_encarregado, branch_id, observacoes, criado_por
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *
   `;
   const values = [
-    codigoAuto, // <--- Código gerado automaticamente
     data.nome,
     data.genero || null,
     data.idade || null,
@@ -92,24 +64,30 @@ export const createCrianca = async (data, userId) => {
   return res.rows[0];
 };
 
+// codigo NÃO faz parte do UPDATE de propósito — não é editável (o próprio
+// pedido do utilizador). Antes fazia `codigo = data.codigo || null`, o que
+// escrevia NULL sempre que o frontend não mandasse codigo — inofensivo
+// enquanto a coluna era nullable, mas passaria a violar a constraint NOT
+// NULL adicionada em criancas_codigo_auto.sql assim que qualquer edição
+// fosse feita. Excluir a coluna do SET evita isto e, ao mesmo tempo, é a
+// forma mais robusta de impedir a edição (nem um payload malicioso com
+// `codigo` consegue alterá-lo através desta rota).
 export const updateCrianca = async (id, data) => {
   const text = `
     UPDATE criancas
     SET
-      codigo = $1,
-      nome = $2,
-      genero = $3,
-      idade = $4,
-      turma = $5,
-      nome_encarregado = $6,
-      contacto_encarregado = $7,
-      branch_id = $8,
-      observacoes = $9
-    WHERE id = $10
+      nome = $1,
+      genero = $2,
+      idade = $3,
+      turma = $4,
+      nome_encarregado = $5,
+      contacto_encarregado = $6,
+      branch_id = $7,
+      observacoes = $8
+    WHERE id = $9
     RETURNING *
   `;
   const values = [
-    data.codigo || null,
     data.nome,
     data.genero || null,
     data.idade || null,
@@ -186,14 +164,20 @@ export const findAulaById = async (id) => {
 // ==================== PRESENÇAS ====================
 
 // Busca presenças de uma aula específica (para a chamada)
+// ✅ COALESCE(p.presente, false): sem registo ainda = ausente por defeito —
+// mesmo critério já usado em Cultos (COALESCE(f.presente, false) na query
+// de presenças). Antes devolvia NULL e cada frontend (web e mobile) tinha
+// de decidir o defeito por conta própria — os dois escolheram `true`, ao
+// contrário do resto do sistema, daí "todos aparecerem presentes".
 export const getPresencasByAula = async (aula_id, turma) => {
   const text = `
     SELECT
       c.id AS crianca_id,
       c.nome,
+      c.codigo,
       c.turma,
       p.id AS presenca_id,
-      p.presente
+      COALESCE(p.presente, false) AS presente
     FROM criancas c
     LEFT JOIN presencas_escolinha p
       ON p.crianca_id = c.id AND p.aula_id = $1
